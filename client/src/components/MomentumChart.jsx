@@ -36,9 +36,9 @@ function CustomTooltip({ active, payload }) {
   const d = payload[0].payload;
   const leading = d.diff > 0 ? 'Heim führt' : d.diff < 0 ? 'Gast führt' : 'Ausgeglichen';
   return (
-    <div className="bg-gray-800 border border-gray-600 rounded px-3 py-2 text-sm shadow-lg">
-      <div className="font-bold">{d.score}</div>
-      <div className="text-gray-400 text-xs">{Math.floor(d.minute)}&apos; · {leading}</div>
+    <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded px-3 py-2 text-sm shadow-lg">
+      <div className="font-bold text-gray-900 dark:text-white">{d.score}</div>
+      <div className="text-gray-500 dark:text-gray-400 text-xs">{Math.floor(d.minute)}&apos; · {leading}</div>
     </div>
   );
 }
@@ -47,13 +47,13 @@ export default function MomentumChart({ events, homeTeamName, awayTeamName }) {
   const data = buildMomentumData(events);
 
   if (data.length <= 1) {
-    return <div className="text-gray-500 text-center py-8">Keine Tordaten vorhanden</div>;
+    return <div className="text-gray-400 dark:text-gray-500 text-center py-8">Keine Tordaten vorhanden</div>;
   }
 
   return (
     <div>
       <h2 className="text-base font-semibold mb-1">Tordifferenz</h2>
-      <p className="text-xs text-gray-500 mb-4">
+      <p className="text-xs text-gray-500 dark:text-gray-500 mb-4">
         Positiv = Heimteam führt · Negativ = Gast führt
       </p>
       <ResponsiveContainer width="100%" height={200}>
@@ -68,38 +68,22 @@ export default function MomentumChart({ events, homeTeamName, awayTeamName }) {
               <stop offset="95%" stopColor="#3b82f6" stopOpacity={0.05} />
             </linearGradient>
           </defs>
-          <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+          <CartesianGrid strokeDasharray="3 3" stroke="#9ca3af" opacity={0.3} />
           <XAxis
             dataKey="minute"
             type="number"
             domain={[0, 60]}
             ticks={[0, 10, 20, 30, 40, 50, 60]}
             tickFormatter={(v) => `${v}'`}
-            stroke="#6b7280"
+            stroke="#9ca3af"
             fontSize={12}
           />
-          <YAxis stroke="#6b7280" fontSize={12} />
+          <YAxis stroke="#9ca3af" fontSize={12} />
           <Tooltip content={<CustomTooltip />} />
-          <ReferenceLine y={0} stroke="#6b7280" strokeWidth={1.5} />
-          <ReferenceLine x={30} stroke="#4b5563" strokeDasharray="3 3" />
-          <Area
-            type="stepAfter"
-            dataKey="pos"
-            stroke="#ef4444"
-            strokeWidth={2}
-            fill="url(#posGrad)"
-            dot={false}
-            legendType="none"
-          />
-          <Area
-            type="stepAfter"
-            dataKey="neg"
-            stroke="#3b82f6"
-            strokeWidth={2}
-            fill="url(#negGrad)"
-            dot={false}
-            legendType="none"
-          />
+          <ReferenceLine y={0} stroke="#9ca3af" strokeWidth={1.5} />
+          <ReferenceLine x={30} stroke="#9ca3af" strokeDasharray="3 3" />
+          <Area type="stepAfter" dataKey="pos" stroke="#ef4444" strokeWidth={2} fill="url(#posGrad)" dot={false} legendType="none" />
+          <Area type="stepAfter" dataKey="neg" stroke="#3b82f6" strokeWidth={2} fill="url(#negGrad)" dot={false} legendType="none" />
         </ComposedChart>
       </ResponsiveContainer>
       <div className="flex justify-center gap-6 mt-2 text-xs text-gray-500">

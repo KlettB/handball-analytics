@@ -221,17 +221,17 @@ function TabSpieldverlauf({ events, homeTeamName, awayTeamName }) {
 
   return (
     <div className="space-y-4">
-      <div className="bg-gray-800 rounded-lg p-4">
+      <div className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm dark:shadow-none">
         <LeadTracker
           events={events}
           homeTeamName={homeTeamName}
           awayTeamName={awayTeamName}
         />
       </div>
-      <div className="bg-gray-800 rounded-lg p-4">
+      <div className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm dark:shadow-none">
         <h2 className="text-base font-semibold mb-3">Ereignisse</h2>
         {/* Column headers */}
-        <div className="grid grid-cols-[44px_1fr_72px_1fr] text-xs text-gray-600 pb-2 mb-0.5 border-b border-gray-700">
+        <div className="grid grid-cols-[44px_1fr_72px_1fr] text-xs text-gray-600 pb-2 mb-0.5 border-b border-gray-100 dark:border-gray-700">
           <div />
           <div className="text-right pr-3 truncate">{homeTeamName}</div>
           <div />
@@ -254,11 +254,11 @@ function TabSpieldverlauf({ events, homeTeamName, awayTeamName }) {
                 const dividerLabel = isFirst ? 'Halbzeit' : 'Endstand';
                 return (
                   <div key={evt.event_id} className="flex items-center gap-2 py-2 my-0.5">
-                    <div className="flex-1 h-px bg-gray-700" />
+                    <div className="flex-1 h-px bg-gray-200 dark:bg-gray-700" />
                     <span className="text-xs text-gray-500 whitespace-nowrap">
                       {dividerLabel}{evt.score_home != null ? ` · ${evt.score_home}:${evt.score_away}` : ''}
                     </span>
-                    <div className="flex-1 h-px bg-gray-700" />
+                    <div className="flex-1 h-px bg-gray-200 dark:bg-gray-700" />
                   </div>
                 );
               }
@@ -271,10 +271,10 @@ function TabSpieldverlauf({ events, homeTeamName, awayTeamName }) {
               return (
                 <div
                   key={evt.event_id}
-                  className="grid grid-cols-[44px_1fr_72px_1fr] items-center py-1.5 border-b border-gray-700/50 last:border-0 text-xs"
+                  className="grid grid-cols-[44px_1fr_72px_1fr] items-center py-1.5 border-b border-gray-100 dark:border-gray-100 dark:border-gray-700 last:border-0 text-xs"
                 >
                   {/* Time */}
-                  <div className="text-gray-500 font-mono">{evt.time}</div>
+                  <div className="text-gray-400 dark:text-gray-500 font-mono">{evt.time}</div>
 
                   {/* Home event */}
                   <div className="text-right pr-3">
@@ -282,7 +282,7 @@ function TabSpieldverlauf({ events, homeTeamName, awayTeamName }) {
                       <>
                         <span className={`font-medium ${color}`}>{label}</span>
                         {evt.player_name && (
-                          <span className="text-gray-300 ml-1">{evt.player_name}</span>
+                          <span className="text-gray-700 dark:text-gray-300 ml-1">{evt.player_name}</span>
                         )}
                       </>
                     )}
@@ -291,7 +291,7 @@ function TabSpieldverlauf({ events, homeTeamName, awayTeamName }) {
                   {/* Score */}
                   <div className="text-center">
                     {isGoal && evt.score_home != null && (
-                      <span className="font-bold text-sm text-white">
+                      <span className="font-bold text-sm text-gray-900 dark:text-white">
                         {evt.score_home}:{evt.score_away}
                       </span>
                     )}
@@ -303,7 +303,7 @@ function TabSpieldverlauf({ events, homeTeamName, awayTeamName }) {
                       <>
                         <span className={`font-medium ${color}`}>{label}</span>
                         {evt.player_name && (
-                          <span className="text-gray-300 ml-1">{evt.player_name}</span>
+                          <span className="text-gray-700 dark:text-gray-300 ml-1">{evt.player_name}</span>
                         )}
                       </>
                     )}
@@ -336,7 +336,7 @@ function TabAnalyse({ events, match }) {
   return (
     <div className="space-y-4">
       {/* Momentum */}
-      <div className="bg-gray-800 rounded-lg p-4">
+      <div className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm dark:shadow-none">
         <MomentumChart
           events={events}
           homeTeamName={match.home_team_name}
@@ -346,30 +346,30 @@ function TabAnalyse({ events, match }) {
 
       {/* Halftime comparison */}
       {halftime && (
-        <div className="bg-gray-800 rounded-lg p-4">
+        <div className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm dark:shadow-none">
           <h2 className="text-base font-semibold mb-3">Halbzeit-Vergleich</h2>
           <div className="grid grid-cols-3 text-sm text-center">
             <div className="text-gray-400 pb-2"></div>
             <div className="font-medium text-gray-300 pb-2">1. Halbzeit</div>
             <div className="font-medium text-gray-300 pb-2">2. Halbzeit</div>
 
-            <div className="text-left text-gray-400 py-2 border-t border-gray-700">
+            <div className="text-left text-gray-500 dark:text-gray-400 py-2 border-t border-gray-100 dark:border-gray-700">
               {match.home_team_name.split(' ').slice(0, 2).join(' ')}
             </div>
-            <div className={`py-2 border-t border-gray-700 font-bold ${htHome > htAway ? 'text-green-400' : htHome < htAway ? 'text-red-400' : 'text-yellow-400'}`}>
+            <div className={`py-2 border-t border-gray-100 dark:border-gray-700 font-bold ${htHome > htAway ? 'text-green-400' : htHome < htAway ? 'text-red-400' : 'text-yellow-400'}`}>
               {htHome}
             </div>
-            <div className={`py-2 border-t border-gray-700 font-bold ${h2Home > h2Away ? 'text-green-400' : h2Home < h2Away ? 'text-red-400' : 'text-yellow-400'}`}>
+            <div className={`py-2 border-t border-gray-100 dark:border-gray-700 font-bold ${h2Home > h2Away ? 'text-green-400' : h2Home < h2Away ? 'text-red-400' : 'text-yellow-400'}`}>
               {h2Home}
             </div>
 
-            <div className="text-left text-gray-400 py-2 border-t border-gray-700">
+            <div className="text-left text-gray-500 dark:text-gray-400 py-2 border-t border-gray-100 dark:border-gray-700">
               {match.away_team_name.split(' ').slice(0, 2).join(' ')}
             </div>
-            <div className={`py-2 border-t border-gray-700 font-bold ${htAway > htHome ? 'text-green-400' : htAway < htHome ? 'text-red-400' : 'text-yellow-400'}`}>
+            <div className={`py-2 border-t border-gray-100 dark:border-gray-700 font-bold ${htAway > htHome ? 'text-green-400' : htAway < htHome ? 'text-red-400' : 'text-yellow-400'}`}>
               {htAway}
             </div>
-            <div className={`py-2 border-t border-gray-700 font-bold ${h2Away > h2Home ? 'text-green-400' : h2Away < h2Home ? 'text-red-400' : 'text-yellow-400'}`}>
+            <div className={`py-2 border-t border-gray-100 dark:border-gray-700 font-bold ${h2Away > h2Home ? 'text-green-400' : h2Away < h2Home ? 'text-red-400' : 'text-yellow-400'}`}>
               {h2Away}
             </div>
           </div>
@@ -377,10 +377,10 @@ function TabAnalyse({ events, match }) {
       )}
 
       {/* Run detection */}
-      <div className="bg-gray-800 rounded-lg p-4">
+      <div className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm dark:shadow-none">
         <h2 className="text-base font-semibold mb-3">Lauf-Erkennung</h2>
         {runs.length === 0 ? (
-          <p className="text-gray-500 text-sm">Keine Läufe von 3+ Toren erkannt.</p>
+          <p className="text-gray-500 dark:text-gray-500 text-sm">Keine Läufe von 3+ Toren erkannt.</p>
         ) : (
           <div className="space-y-2">
             {runs.map((r, i) => {
@@ -394,12 +394,12 @@ function TabAnalyse({ events, match }) {
                     <span className={`font-bold ${isWolf ? 'text-green-400' : 'text-red-400'}`}>
                       {r.goals}:0 Lauf
                     </span>
-                    <span className="text-gray-400 text-xs">
+                    <span className="text-gray-500 dark:text-gray-400 text-xs">
                       {r.startTime} – {r.endTime}
                       {r.durationMin > 0 && ` (${r.durationMin} Min.)`}
                     </span>
                   </div>
-                  <div className="text-gray-400 text-xs">
+                  <div className="text-gray-500 dark:text-gray-400 text-xs">
                     {isWolf
                       ? match.home_team_name === 'TSV Wolfschlugen' || match.is_home_game
                         ? 'TSV Wolfschlugen'
@@ -420,9 +420,9 @@ function TabAnalyse({ events, match }) {
       {/* Timeout effectiveness */}
       {/* Powerplay / Shorthanded */}
       {penaltySessions.length > 0 && (
-        <div className="bg-gray-800 rounded-lg p-4">
+        <div className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm dark:shadow-none">
           <h2 className="text-base font-semibold mb-1">Über-/Unterzahl</h2>
-          <p className="text-xs text-gray-500 mb-3">Tore in den 2 Minuten nach einer Strafe</p>
+          <p className="text-xs text-gray-500 dark:text-gray-500 mb-3">Tore in den 2 Minuten nach einer Strafe</p>
 
           {/* Summary cards */}
           {(() => {
@@ -457,7 +457,7 @@ function TabAnalyse({ events, match }) {
                         <span>Tore kassiert</span>
                         <span className="font-medium text-red-400">{s.conceded}</span>
                       </div>
-                      <div className="border-t border-gray-700 pt-1 flex justify-between gap-1 text-gray-500">
+                      <div className="border-t border-gray-100 dark:border-gray-700 pt-1 flex justify-between gap-1 text-gray-500">
                         <span className="text-green-400">{s.won}× gew.</span>
                         <span>{s.neutral}× neut.</span>
                         <span className="text-red-400">{s.lost}× verl.</span>
@@ -477,9 +477,9 @@ function TabAnalyse({ events, match }) {
               return (
                 <div
                   key={i}
-                  className="flex items-start gap-2 py-2 border-b border-gray-700 last:border-0 text-sm"
+                  className="flex items-start gap-2 py-2 border-b border-gray-100 dark:border-gray-700 last:border-0 text-sm"
                 >
-                  <span className="text-gray-500 font-mono w-10 text-right shrink-0">
+                  <span className="text-gray-400 dark:text-gray-500 font-mono w-10 text-right shrink-0">
                     {s.time}
                   </span>
                   <span
@@ -491,7 +491,7 @@ function TabAnalyse({ events, match }) {
                   >
                     {isUeber ? 'Überzahl' : 'Unterzahl'}
                   </span>
-                  <span className="flex-1 min-w-0 text-gray-400 text-xs">
+                  <span className="flex-1 min-w-0 text-gray-500 dark:text-gray-400 text-xs">
                     {s.playerName && (
                       <span className="text-gray-300">{s.playerName} · </span>
                     )}
@@ -518,7 +518,7 @@ function TabAnalyse({ events, match }) {
       )}
 
       {timeouts.length > 0 && (
-        <div className="bg-gray-800 rounded-lg p-4">
+        <div className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm dark:shadow-none">
           <h2 className="text-base font-semibold mb-3">Auszeit-Effektivität</h2>
           <div className="space-y-2">
             {timeouts.map((t, i) => {
@@ -535,9 +535,9 @@ function TabAnalyse({ events, match }) {
                 ? (nextIsWolf ? 'TSV Wolfschlugen' : ne.team === 'Home' ? match.home_team_name : match.away_team_name)
                 : null;
               return (
-                <div key={i} className="py-2 border-b border-gray-700 last:border-0 text-sm">
+                <div key={i} className="py-2 border-b border-gray-100 dark:border-gray-700 last:border-0 text-sm">
                   <div className="flex items-center gap-3">
-                    <span className="text-gray-500 font-mono w-10 text-right shrink-0">{t.time}</span>
+                    <span className="text-gray-400 dark:text-gray-500 font-mono w-10 text-right shrink-0">{t.time}</span>
                     <span className="text-blue-400 shrink-0">
                       Auszeit {isWolf ? 'TSV Wolfschlugen' : t.team === 'Home' ? match.home_team_name : match.away_team_name}
                     </span>
@@ -550,7 +550,7 @@ function TabAnalyse({ events, match }) {
                         }{wolfGoalsAfter}:{oppGoalsAfter}
                       </span>
                       {t.cutShort && t.cutReason && (
-                        <div className="text-xs text-gray-600">
+                        <div className="text-xs text-gray-400 dark:text-gray-600">
                           {t.cutReason === 'halbzeit' && 'bis Halbzeit'}
                           {t.cutReason === 'spielende' && 'bis Spielende'}
                           {t.cutReason === 'auszeit' && 'bis nächste Auszeit'}
@@ -571,7 +571,7 @@ function TabAnalyse({ events, match }) {
               );
             })}
           </div>
-          <p className="text-xs text-gray-600 mt-2">
+          <p className="text-xs text-gray-400 dark:text-gray-600 mt-2">
             Tore Wolf:Gegner · Fenster 4 Min, begrenzt auf Halbzeitende
           </p>
         </div>
@@ -592,10 +592,10 @@ function TabSpieler({ events, match }) {
   }
 
   return (
-    <div className="bg-gray-800 rounded-lg overflow-hidden">
+    <div className="bg-white dark:bg-gray-800 rounded-lg overflow-hidden shadow-sm dark:shadow-none">
       <table className="w-full text-sm">
         <thead>
-          <tr className="border-b border-gray-700 text-gray-400 text-xs">
+          <tr className="border-b border-gray-100 dark:border-gray-700 text-gray-500 dark:text-gray-400 text-xs">
             <th className="text-left px-4 py-3">Spieler</th>
             <th className="px-2 py-3 text-center w-10" title="Tore">T</th>
             <th className="px-2 py-3 text-center w-10" title="7-Meter Tore">7m</th>
@@ -607,7 +607,7 @@ function TabSpieler({ events, match }) {
         </thead>
         <tbody>
           {players.map((p) => (
-            <tr key={p.name} className="border-b border-gray-700 last:border-0 hover:bg-gray-750">
+            <tr key={p.name} className="border-b border-gray-100 dark:border-gray-700 last:border-0 hover:bg-gray-50 dark:hover:bg-gray-750">
               <td className="px-4 py-2.5">
                 {p.name}
                 {p.number && (
@@ -685,13 +685,13 @@ export default function MatchDetail() {
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-6">
-      <Link to="/matches" className="text-sm text-gray-400 hover:text-white mb-4 inline-block">
+      <Link to="/matches" className="text-sm text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white mb-4 inline-block">
         &larr; Alle Spiele
       </Link>
 
       {/* Score header */}
-      <div className="bg-gray-800 rounded-lg p-6 mb-4">
-        <div className="text-xs text-gray-500 text-center mb-3">
+      <div className="bg-white dark:bg-gray-800 rounded-lg p-6 mb-4 shadow-sm dark:shadow-none">
+        <div className="text-xs text-gray-400 dark:text-gray-500 text-center mb-3">
           {formatDate(match.starts_at)} · {formatTime(match.starts_at)}
           {match.venue_name && ` · ${match.venue_name}`}
           {match.venue_city && `, ${match.venue_city}`}
@@ -721,15 +721,15 @@ export default function MatchDetail() {
       </div>
 
       {/* Tabs */}
-      <div className="flex border-b border-gray-700 mb-4">
+      <div className="flex border-b border-gray-100 dark:border-gray-700 mb-4">
         {TABS.map((tab) => (
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
             className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px ${
               activeTab === tab.id
-                ? 'border-white text-white'
-                : 'border-transparent text-gray-400 hover:text-white'
+                ? 'border-gray-900 dark:border-white text-gray-900 dark:text-white'
+                : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
             }`}
           >
             {tab.label}

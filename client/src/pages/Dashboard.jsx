@@ -27,7 +27,7 @@ function computeStats(matches) {
 }
 
 function resultColor(m) {
-  if (m.state !== 'Post' || m.home_goals == null) return 'bg-gray-600';
+  if (m.state !== 'Post' || m.home_goals == null) return 'bg-gray-400 dark:bg-gray-600';
   const own = m.is_home_game ? m.home_goals : m.away_goals;
   const opp = m.is_home_game ? m.away_goals : m.home_goals;
   if (own > opp) return 'bg-green-500';
@@ -59,7 +59,7 @@ export default function Dashboard() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-24">
-        <div className="text-lg text-gray-400">Laden...</div>
+        <div className="text-lg text-gray-500 dark:text-gray-400">Laden...</div>
       </div>
     );
   }
@@ -86,30 +86,28 @@ export default function Dashboard() {
   return (
     <div className="max-w-2xl mx-auto px-4 py-6 space-y-6">
       {/* Season record */}
-      <div className="bg-gray-800 rounded-lg p-5">
-        <h2 className="text-sm text-gray-400 uppercase tracking-wide mb-4">Saison 2025/26</h2>
+      <div className="bg-white dark:bg-gray-800 rounded-lg p-5 shadow-sm dark:shadow-none">
+        <h2 className="text-sm text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-4">Saison 2025/26</h2>
         <div className="grid grid-cols-3 gap-4 mb-4">
           <div className="text-center">
-            <div className="text-3xl font-bold text-green-400">{stats.wins}</div>
+            <div className="text-3xl font-bold text-green-500 dark:text-green-400">{stats.wins}</div>
             <div className="text-xs text-gray-500 mt-1">Siege</div>
           </div>
           <div className="text-center">
-            <div className="text-3xl font-bold text-yellow-400">{stats.draws}</div>
+            <div className="text-3xl font-bold text-yellow-500 dark:text-yellow-400">{stats.draws}</div>
             <div className="text-xs text-gray-500 mt-1">Unentschieden</div>
           </div>
           <div className="text-center">
-            <div className="text-3xl font-bold text-red-400">{stats.losses}</div>
+            <div className="text-3xl font-bold text-red-500 dark:text-red-400">{stats.losses}</div>
             <div className="text-xs text-gray-500 mt-1">Niederlagen</div>
           </div>
         </div>
-        <div className="flex justify-center gap-6 text-sm text-gray-400 border-t border-gray-700 pt-3">
+        <div className="flex justify-center gap-6 text-sm text-gray-500 dark:text-gray-400 border-t border-gray-100 dark:border-gray-700 pt-3">
           <span>{stats.played} Spiele</span>
-          <span className="text-gray-600">·</span>
-          <span>
-            {stats.goalsFor}:{stats.goalsAgainst} Tore
-          </span>
-          <span className="text-gray-600">·</span>
-          <span className={stats.goalsFor - stats.goalsAgainst >= 0 ? 'text-green-400' : 'text-red-400'}>
+          <span className="text-gray-300 dark:text-gray-600">·</span>
+          <span>{stats.goalsFor}:{stats.goalsAgainst} Tore</span>
+          <span className="text-gray-300 dark:text-gray-600">·</span>
+          <span className={stats.goalsFor - stats.goalsAgainst >= 0 ? 'text-green-500 dark:text-green-400' : 'text-red-500 dark:text-red-400'}>
             {stats.goalsFor - stats.goalsAgainst >= 0 ? '+' : ''}
             {stats.goalsFor - stats.goalsAgainst}
           </span>
@@ -118,31 +116,21 @@ export default function Dashboard() {
 
       {/* Recent form */}
       {recentFive.length > 0 && (
-        <div className="bg-gray-800 rounded-lg p-5">
-          <h2 className="text-sm text-gray-400 uppercase tracking-wide mb-4">Letzte 5 Spiele</h2>
+        <div className="bg-white dark:bg-gray-800 rounded-lg p-5 shadow-sm dark:shadow-none">
+          <h2 className="text-sm text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-4">Letzte 5 Spiele</h2>
           <div className="space-y-2">
             {recentFive.map((m) => {
               const own = m.is_home_game ? m.home_goals : m.away_goals;
               const opp = m.is_home_game ? m.away_goals : m.home_goals;
               const opponent = m.is_home_game ? m.away_team_name : m.home_team_name;
               return (
-                <Link
-                  key={m.id}
-                  to={`/matches/${m.id}`}
-                  className="flex items-center gap-3 hover:opacity-80"
-                >
-                  <span
-                    className={`w-6 h-6 rounded text-xs font-bold flex items-center justify-center text-white shrink-0 ${resultColor(m)}`}
-                  >
+                <Link key={m.id} to={`/matches/${m.id}`} className="flex items-center gap-3 hover:opacity-80">
+                  <span className={`w-6 h-6 rounded text-xs font-bold flex items-center justify-center text-white shrink-0 ${resultColor(m)}`}>
                     {resultLabel(m)}
                   </span>
-                  <span className="text-xs text-gray-500 w-24 shrink-0">
-                    {formatDate(m.starts_at)}
-                  </span>
+                  <span className="text-xs text-gray-400 dark:text-gray-500 w-24 shrink-0">{formatDate(m.starts_at)}</span>
                   <span className="flex-1 truncate text-sm">{opponent}</span>
-                  <span className="text-sm font-bold whitespace-nowrap">
-                    {own} : {opp}
-                  </span>
+                  <span className="text-sm font-bold whitespace-nowrap">{own} : {opp}</span>
                 </Link>
               );
             })}
@@ -152,9 +140,9 @@ export default function Dashboard() {
 
       {/* Formkurve */}
       {formData.length > 0 && (
-        <div className="bg-gray-800 rounded-lg p-5">
-          <h2 className="text-sm text-gray-400 uppercase tracking-wide mb-1">Formkurve</h2>
-          <p className="text-xs text-gray-500 mb-4">Tordifferenz pro Spiel</p>
+        <div className="bg-white dark:bg-gray-800 rounded-lg p-5 shadow-sm dark:shadow-none">
+          <h2 className="text-sm text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">Formkurve</h2>
+          <p className="text-xs text-gray-400 dark:text-gray-500 mb-4">Tordifferenz pro Spiel</p>
           {(() => {
             const maxAbs = Math.max(...formData.map((d) => Math.abs(d.diff)), 1);
             return (
@@ -171,15 +159,11 @@ export default function Dashboard() {
                       title={`${d.opponent}: ${d.own}:${d.opp} (${d.diff >= 0 ? '+' : ''}${d.diff})`}
                     >
                       <div style={{ height: 30, display: 'flex', alignItems: 'flex-end', width: '100%' }}>
-                        {isPos && (
-                          <div style={{ width: '100%', height: barH, backgroundColor: barColor, borderRadius: '2px 2px 0 0' }} />
-                        )}
+                        {isPos && <div style={{ width: '100%', height: barH, backgroundColor: barColor, borderRadius: '2px 2px 0 0' }} />}
                       </div>
-                      <div style={{ width: '100%', height: 2, backgroundColor: '#4b5563' }} />
+                      <div style={{ width: '100%', height: 2, backgroundColor: '#6b7280' }} />
                       <div style={{ height: 30, display: 'flex', alignItems: 'flex-start', width: '100%' }}>
-                        {isNeg && (
-                          <div style={{ width: '100%', height: barH, backgroundColor: barColor, borderRadius: '0 0 2px 2px' }} />
-                        )}
+                        {isNeg && <div style={{ width: '100%', height: barH, backgroundColor: barColor, borderRadius: '0 0 2px 2px' }} />}
                       </div>
                     </div>
                   );
@@ -187,7 +171,7 @@ export default function Dashboard() {
               </div>
             );
           })()}
-          <div className="flex justify-between text-xs text-gray-600 mt-1">
+          <div className="flex justify-between text-xs text-gray-400 dark:text-gray-600 mt-1">
             <span>Spieltag 1</span>
             <span>Spieltag {formData.length}</span>
           </div>
@@ -196,19 +180,17 @@ export default function Dashboard() {
 
       {/* Upcoming */}
       {upcoming.length > 0 && (
-        <div className="bg-gray-800 rounded-lg p-5">
-          <h2 className="text-sm text-gray-400 uppercase tracking-wide mb-4">Nächste Spiele</h2>
+        <div className="bg-white dark:bg-gray-800 rounded-lg p-5 shadow-sm dark:shadow-none">
+          <h2 className="text-sm text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-4">Nächste Spiele</h2>
           <div className="space-y-2">
             {upcoming.map((m) => {
               const opponent = m.is_home_game ? m.away_team_name : m.home_team_name;
               const venue = m.is_home_game ? 'Heim' : 'Auswärts';
               return (
                 <div key={m.id} className="flex items-center gap-3 text-sm">
-                  <span className="text-xs text-gray-500 w-24 shrink-0">
-                    {formatDate(m.starts_at)}
-                  </span>
+                  <span className="text-xs text-gray-400 dark:text-gray-500 w-24 shrink-0">{formatDate(m.starts_at)}</span>
                   <span className="flex-1 truncate">{opponent}</span>
-                  <span className="text-xs text-gray-500">{venue}</span>
+                  <span className="text-xs text-gray-400 dark:text-gray-500">{venue}</span>
                 </div>
               );
             })}
@@ -218,26 +200,17 @@ export default function Dashboard() {
 
       {/* Quick links */}
       <div className="grid grid-cols-2 gap-3">
-        <Link
-          to="/matches"
-          className="bg-gray-800 rounded-lg p-4 hover:bg-gray-700 transition-colors"
-        >
+        <Link to="/matches" className="bg-white dark:bg-gray-800 rounded-lg p-4 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors shadow-sm dark:shadow-none">
           <div className="font-semibold mb-1">Alle Spiele</div>
-          <div className="text-xs text-gray-400">{matches.length} Einträge</div>
+          <div className="text-xs text-gray-500 dark:text-gray-400">{matches.length} Einträge</div>
         </Link>
-        <Link
-          to="/players"
-          className="bg-gray-800 rounded-lg p-4 hover:bg-gray-700 transition-colors"
-        >
+        <Link to="/players" className="bg-white dark:bg-gray-800 rounded-lg p-4 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors shadow-sm dark:shadow-none">
           <div className="font-semibold mb-1">Spielerstatistik</div>
-          <div className="text-xs text-gray-400">Saison-Übersicht</div>
+          <div className="text-xs text-gray-500 dark:text-gray-400">Saison-Übersicht</div>
         </Link>
-        <Link
-          to="/team"
-          className="bg-gray-800 rounded-lg p-4 hover:bg-gray-700 transition-colors"
-        >
+        <Link to="/team" className="bg-white dark:bg-gray-800 rounded-lg p-4 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors shadow-sm dark:shadow-none">
           <div className="font-semibold mb-1">Teamanalyse</div>
-          <div className="text-xs text-gray-400">Heim/Auswärts, Trends</div>
+          <div className="text-xs text-gray-500 dark:text-gray-400">Heim/Auswärts, Trends</div>
         </Link>
       </div>
     </div>

@@ -46,7 +46,7 @@ export default function MatchList() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-24">
-        <div className="text-lg text-gray-400">Laden...</div>
+        <div className="text-lg text-gray-500 dark:text-gray-400">Laden...</div>
       </div>
     );
   }
@@ -55,11 +55,11 @@ export default function MatchList() {
     <div className="max-w-2xl mx-auto px-4 py-6">
       {matches.length === 0 ? (
         <div className="text-center py-12">
-          <p className="text-gray-400 mb-4">Noch keine Spieldaten vorhanden.</p>
+          <p className="text-gray-500 dark:text-gray-400 mb-4">Noch keine Spieldaten vorhanden.</p>
           <button
             onClick={triggerFetch}
             disabled={fetching}
-            className="px-4 py-2 bg-gray-700 text-white rounded hover:bg-gray-600 disabled:opacity-50"
+            className="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-white rounded hover:bg-gray-300 dark:hover:bg-gray-600 disabled:opacity-50"
           >
             {fetching ? 'Daten werden geladen...' : 'Daten laden'}
           </button>
@@ -67,11 +67,11 @@ export default function MatchList() {
       ) : (
         <>
           <div className="flex justify-between items-center mb-4">
-            <span className="text-sm text-gray-400">{matches.length} Spiele</span>
+            <span className="text-sm text-gray-500 dark:text-gray-400">{matches.length} Spiele</span>
             <button
               onClick={triggerFetch}
               disabled={fetching}
-              className="text-sm px-3 py-1 border border-gray-600 rounded hover:bg-gray-800 disabled:opacity-50"
+              className="text-sm px-3 py-1 border border-gray-300 dark:border-gray-600 rounded hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-50"
             >
               {fetching ? 'Läuft...' : 'Aktualisieren'}
             </button>
@@ -95,25 +95,25 @@ function MatchCard({ match }) {
   if (isFinished && match.home_goals != null) {
     const own = isHome ? match.home_goals : match.away_goals;
     const opp = isHome ? match.away_goals : match.home_goals;
-    if (own > opp) resultClass = 'text-green-400';
-    else if (own < opp) resultClass = 'text-red-400';
-    else resultClass = 'text-yellow-400';
+    if (own > opp) resultClass = 'text-green-500 dark:text-green-400';
+    else if (own < opp) resultClass = 'text-red-500 dark:text-red-400';
+    else resultClass = 'text-yellow-500 dark:text-yellow-400';
   }
 
   const inner = (
-    <div className="bg-gray-800 rounded-lg p-4 hover:bg-gray-750 transition-colors">
+    <div className="bg-white dark:bg-gray-800 rounded-lg p-4 hover:bg-gray-50 dark:hover:bg-gray-750 transition-colors shadow-sm dark:shadow-none">
       <div className="flex items-center justify-between gap-4">
         <div className="flex-1 min-w-0">
-          <div className="text-xs text-gray-500 mb-1">
+          <div className="text-xs text-gray-400 dark:text-gray-500 mb-1">
             {formatDate(match.starts_at)} · {formatTime(match.starts_at)}
             {match.venue_city && ` · ${match.venue_city}`}
           </div>
           <div className="flex items-center gap-2">
-            <span className={`font-semibold truncate ${isHome ? 'text-white' : ''}`}>
+            <span className={`font-semibold truncate ${isHome ? 'text-gray-900 dark:text-white' : 'text-gray-600 dark:text-gray-300'}`}>
               {match.home_team_name}
             </span>
-            <span className="text-gray-500">–</span>
-            <span className={`font-semibold truncate ${!isHome ? 'text-white' : ''}`}>
+            <span className="text-gray-400 dark:text-gray-500">–</span>
+            <span className={`font-semibold truncate ${!isHome ? 'text-gray-900 dark:text-white' : 'text-gray-600 dark:text-gray-300'}`}>
               {match.away_team_name}
             </span>
           </div>
@@ -123,7 +123,7 @@ function MatchCard({ match }) {
             {match.home_goals} : {match.away_goals}
           </div>
         ) : (
-          <div className="text-sm text-gray-500 whitespace-nowrap">
+          <div className="text-sm text-gray-400 dark:text-gray-500 whitespace-nowrap">
             {formatTime(match.starts_at)}
           </div>
         )}
