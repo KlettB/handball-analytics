@@ -1,5 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import {
+  ComposedChart, Bar, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, ReferenceLine,
+} from 'recharts';
 
 function StatBox({ label, value, color = 'text-gray-900 dark:text-white' }) {
   return (
@@ -100,26 +103,38 @@ function PowerplayCard({ label, data, color, bg, border }) {
 export default function Team() {
   const [matches, setMatches] = useState([]);
   const [phases, setPhases] = useState([]);
+  const [phaseExtremes, setPhaseExtremes] = useState(null);
   const [powerplay, setPowerplay] = useState(null);
   const [comebacks, setComebacks] = useState([]);
+  const [formData, setFormData] = useState([]);
+  const [goalsTrend, setGoalsTrend] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('uebersicht');
   const [filterLocation, setFilterLocation] = useState('all');
   const [filterHalf, setFilterHalf] = useState('all');
   const [filterLoading, setFilterLoading] = useState(false);
+  const [trendLocation, setTrendLocation] = useState('all');
+  const [trendHalf, setTrendHalf] = useState('all');
+  const [trendLoading, setTrendLoading] = useState(false);
 
   useEffect(() => {
     Promise.all([
       fetch('/api/matches').then((r) => r.json()),
       fetch('/api/stats/phases').then((r) => r.json()),
+      fetch('/api/stats/phases/extremes').then((r) => r.json()),
       fetch('/api/stats/powerplay').then((r) => r.json()),
       fetch('/api/stats/comebacks').then((r) => r.json()),
+      fetch('/api/stats/form').then((r) => r.json()),
+      fetch('/api/stats/goals-trend').then((r) => r.json()),
     ])
-      .then(([m, p, pp, cb]) => {
+      .then(([m, p, pe, pp, cb, fd, gt]) => {
         setMatches(m);
         setPhases(p);
+        setPhaseExtremes(pe);
         setPowerplay(pp);
         setComebacks(cb);
+        setFormData(fd);
+        setGoalsTrend(gt);
       })
       .catch(console.error)
       .finally(() => setLoading(false));
@@ -131,15 +146,27 @@ export default function Team() {
     const params = new URLSearchParams({ location: filterLocation, half: filterHalf });
     Promise.all([
       fetch(`/api/stats/phases?${params}`).then((r) => r.json()),
+      fetch(`/api/stats/phases/extremes?${params}`).then((r) => r.json()),
       fetch(`/api/stats/powerplay?${params}`).then((r) => r.json()),
     ])
-      .then(([p, pp]) => {
+      .then(([p, pe, pp]) => {
         setPhases(p);
+        setPhaseExtremes(pe);
         setPowerplay(pp);
       })
       .catch(console.error)
       .finally(() => setFilterLoading(false));
   }, [filterLocation, filterHalf, activeTab]);
+
+  useEffect(() => {
+    setTrendLoading(true);
+    const params = new URLSearchParams({ location: trendLocation, half: trendHalf });
+    fetch(`/api/stats/goals-trend?${params}`)
+      .then((r) => r.json())
+      .then(setGoalsTrend)
+      .catch(console.error)
+      .finally(() => setTrendLoading(false));
+  }, [trendLocation, trendHalf]);
 
   if (loading) {
     return (
@@ -226,6 +253,54 @@ export default function Team() {
             />
             {filterLoading && <span className="text-xs text-gray-500">Lädt...</span>}
           </div>
+
+          {/* Power / Death Phase */}
+          {phaseExtremes && (phaseExtremes.powerPhase || phaseExtremes.deathPhase) && (
+            <div className="grid grid-cols-2 gap-4">
+              {phaseExtremes.powerPhase && (
+                <div className="rounded-lg p-4 border bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800/40">
+                  <div className="text-xs font-semibold text-green-600 dark:text-green-400 mb-2">
+                    ⚡ Power-Phase {phaseExtremes.powerPhase.start}′–{phaseExtremes.powerPhase.end}′
+                  </div>
+                  <div className="space-y-1 text-xs">
+                    <div className="flex justify-between">
+                      <span className="text-gray-600 dark:text-gray-400">Wolf-Tore</span>
+                      <span className="font-medium text-green-400">{phaseExtremes.powerPhase.wolfGoals}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600 dark:text-gray-400">Gegentore</span>
+                      <span className="font-medium text-red-400">{phaseExtremes.powerPhase.oppGoals}</span>
+                    </div>
+                    <div className="flex justify-between border-t border-green-200 dark:border-green-800/40 pt-1">
+                      <span className="text-gray-600 dark:text-gray-400">Netto</span>
+                      <span className="font-bold text-green-400">+{phaseExtremes.powerPhase.net}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+              {phaseExtremes.deathPhase && (
+                <div className="rounded-lg p-4 border bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800/40">
+                  <div className="text-xs font-semibold text-red-600 dark:text-red-400 mb-2">
+                    ⚠ Schwächephase {phaseExtremes.deathPhase.start}′–{phaseExtremes.deathPhase.end}′
+                  </div>
+                  <div className="space-y-1 text-xs">
+                    <div className="flex justify-between">
+                      <span className="text-gray-600 dark:text-gray-400">Wolf-Tore</span>
+                      <span className="font-medium text-green-400">{phaseExtremes.deathPhase.wolfGoals}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600 dark:text-gray-400">Gegentore</span>
+                      <span className="font-medium text-red-400">{phaseExtremes.deathPhase.oppGoals}</span>
+                    </div>
+                    <div className="flex justify-between border-t border-red-200 dark:border-red-800/40 pt-1">
+                      <span className="text-gray-600 dark:text-gray-400">Netto</span>
+                      <span className="font-bold text-red-400">{phaseExtremes.deathPhase.net}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Schwächephasen */}
           {phases.length > 0 && (
@@ -317,6 +392,137 @@ export default function Team() {
       )}
 
       {activeTab === 'uebersicht' && <div className="space-y-6">
+
+      {/* Formkurve */}
+      {formData.length > 0 && (() => {
+        const last5 = [...formData].slice(-5);
+        const resultLabel = (r) => r.result === 'win' ? 'S' : r.result === 'draw' ? 'U' : 'N';
+        const resultBadge = (r) => r.result === 'win'
+          ? 'bg-green-100 dark:bg-green-900/50 text-green-600 dark:text-green-400'
+          : r.result === 'draw'
+          ? 'bg-yellow-100 dark:bg-yellow-900/50 text-yellow-600 dark:text-yellow-400'
+          : 'bg-red-100 dark:bg-red-900/50 text-red-600 dark:text-red-400';
+        const chartData = formData.map((d) => ({ ...d, diffDisplay: d.diff }));
+        const CustomTooltip = ({ active, payload }) => {
+          if (!active || !payload?.length) return null;
+          const d = payload[0]?.payload;
+          if (!d) return null;
+          return (
+            <div className="bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded px-2 py-1.5 text-xs shadow">
+              <div className="font-medium text-gray-900 dark:text-white mb-0.5">
+                Sp. {d.gameIndex}: {d.opponent}
+              </div>
+              <div className="text-gray-500">{d.own}:{d.opp} · {d.cumulativePoints} Pkt</div>
+            </div>
+          );
+        };
+        return (
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-5 shadow-sm dark:shadow-none">
+            <div className="flex items-start justify-between mb-1">
+              <div>
+                <h2 className="text-sm text-gray-500 dark:text-gray-400 uppercase tracking-wide">Formkurve</h2>
+                <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">Tordifferenz + kumulierte Punkte</p>
+              </div>
+              <div className="flex gap-1">
+                {last5.map((d, i) => (
+                  <Link key={d.matchId} to={`/matches/${d.matchId}`} className={`w-6 h-6 rounded text-xs font-bold flex items-center justify-center hover:opacity-80 ${resultBadge(d)}`}>
+                    {resultLabel(d)}
+                  </Link>
+                ))}
+              </div>
+            </div>
+            <div className="mt-3" style={{ height: 120 }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <ComposedChart data={chartData} margin={{ top: 4, right: 24, bottom: 0, left: -16 }}>
+                  <XAxis dataKey="gameIndex" tick={false} axisLine={false} tickLine={false} />
+                  <YAxis yAxisId="left" tick={{ fontSize: 10, fill: '#9ca3af' }} tickLine={false} axisLine={false} />
+                  <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 10, fill: '#60a5fa' }} tickLine={false} axisLine={false} />
+                  <Tooltip content={<CustomTooltip />} />
+                  <ReferenceLine yAxisId="left" y={0} stroke="#6b7280" strokeWidth={1} />
+                  <Bar yAxisId="left" dataKey="diffDisplay" radius={[2, 2, 0, 0]} maxBarSize={20}>
+                    {chartData.map((d, i) => (
+                      <Cell key={i} fill={d.diff > 0 ? '#22c55e' : d.diff < 0 ? '#ef4444' : '#eab308'} />
+                    ))}
+                  </Bar>
+                  <Line yAxisId="right" type="monotone" dataKey="cumulativePoints" stroke="#60a5fa" strokeWidth={2} dot={false} />
+                </ComposedChart>
+              </ResponsiveContainer>
+            </div>
+            <div className="flex gap-4 mt-2 text-xs text-gray-400 dark:text-gray-500">
+              <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-green-500 inline-block" /> Tordiff.</span>
+              <span className="flex items-center gap-1"><span className="w-4 border-t-2 border-blue-400 inline-block" /> Punkte (kum.)</span>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Tore / Gegentore Entwicklung */}
+      {goalsTrend.filter((d) => d.own != null).length > 0 && (() => {
+        const validData = goalsTrend.filter((d) => d.own != null);
+        const CustomTooltip = ({ active, payload }) => {
+          if (!active || !payload?.length) return null;
+          const d = payload[0]?.payload;
+          if (!d) return null;
+          return (
+            <div className="bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded px-2 py-1.5 text-xs shadow">
+              <div className="font-medium text-gray-900 dark:text-white mb-0.5">
+                Sp. {d.gameIndex}: {d.opponent}
+              </div>
+              <div className="text-green-400">{d.own} erzielt</div>
+              <div className="text-red-400">{d.opp} kassiert</div>
+            </div>
+          );
+        };
+        return (
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-5 shadow-sm dark:shadow-none">
+            <div className="flex items-start justify-between flex-wrap gap-3 mb-3">
+              <div>
+                <h2 className="text-sm text-gray-500 dark:text-gray-400 uppercase tracking-wide">Tore / Gegentore</h2>
+                <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">Entwicklung über die Saison</p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <FilterToggle
+                  options={[
+                    { value: 'all', label: 'Alle' },
+                    { value: 'home', label: 'Heim' },
+                    { value: 'away', label: 'Auswärts' },
+                  ]}
+                  value={trendLocation}
+                  onChange={setTrendLocation}
+                />
+                <FilterToggle
+                  options={[
+                    { value: 'all', label: 'Gesamt' },
+                    { value: '1', label: '1. HZ' },
+                    { value: '2', label: '2. HZ' },
+                  ]}
+                  value={trendHalf}
+                  onChange={setTrendHalf}
+                />
+              </div>
+            </div>
+            {trendLoading ? (
+              <div className="text-xs text-gray-400 py-4 text-center">Lädt...</div>
+            ) : (
+              <div style={{ height: 120 }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <ComposedChart data={validData} margin={{ top: 4, right: 8, bottom: 0, left: -16 }}>
+                    <XAxis dataKey="gameIndex" tick={false} axisLine={false} tickLine={false} />
+                    <YAxis tick={{ fontSize: 10, fill: '#9ca3af' }} tickLine={false} axisLine={false} />
+                    <Tooltip content={<CustomTooltip />} />
+                    <Line type="monotone" dataKey="own" stroke="#22c55e" strokeWidth={2} dot={false} name="Erzielt" />
+                    <Line type="monotone" dataKey="opp" stroke="#ef4444" strokeWidth={2} dot={false} name="Kassiert" />
+                  </ComposedChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+            <div className="flex gap-4 mt-2 text-xs text-gray-400 dark:text-gray-500">
+              <span className="flex items-center gap-1"><span className="w-4 border-t-2 border-green-500 inline-block" /> Tore erzielt</span>
+              <span className="flex items-center gap-1"><span className="w-4 border-t-2 border-red-500 inline-block" /> Tore kassiert</span>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Overall stats */}
       <div className="bg-white dark:bg-gray-800 rounded-lg p-5 shadow-sm dark:shadow-none">

@@ -58,7 +58,38 @@ Tooltip: Gegner, Ergebnis, Datum, Spielnummer
 
 ---
 
+---
+
+## 6.3 Tore/Gegentore-Entwicklung über Spiele
+
+### Idee
+Chart der geschossenen Tore und Gegentore über alle Spiele hinweg (chronologisch) — zeigt wie sich Angriff und Abwehr über die Saison entwickeln. Trending up oder down?
+
+### Darstellung
+Zwei Linien (Recharts):
+- **Tore erzielt** (grün) — pro Spiel
+- **Tore kassiert** (rot) — pro Spiel
+
+Optional: gleitender Durchschnitt über 3 Spiele als gestrichelte Linie drüber.
+
+Tooltip: Gegner, Ergebnis, genaue Tore.
+
+### Filter
+- Heim / Auswärts / Alle
+- 1. Halbzeit / 2. Halbzeit / Gesamt
+
+Bei Halbzeit-Filter: Halbzeittore aus `home_goals_half` / `away_goals_half` (matches-Tabelle) bzw. aus Events berechnen.
+
+### UI
+- Eigene Card in Team-Analyse Übersicht (nach Formkurve)
+- Oder als separater Tab in der Phasenanalyse
+
+### Datenbasis
+Alles vorhanden — keine neuen Fetches nötig.
+
+---
+
 ## Abhängigkeiten
 Keine — alle Daten bereits vorhanden.
 
-## Status: TODO
+## Status: DONE

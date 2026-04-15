@@ -199,4 +199,146 @@ router.get('/comebacks', (req, res) => {
   res.json(comebacks);
 });
 
+// GET /api/stats/phases/extremes - rolling 5-min window power/death phase
+// Query params: location=home|away|all, half=1|2|all
+router.get('/phases/extremes', (req, res) => {
+  const db = getDb();
+  const { location = 'all', half = 'all' } = req.query;
+
+  let locationFilter = '';
+  if (location === 'home') locationFilter = 'AND m.is_home_game = 1';
+  else if (location === 'away') locationFilter = 'AND m.is_home_game = 0';
+
+  let halfFilter = '';
+  if (half === '1') halfFilter = 'AND me.elapsed_seconds < 1800';
+  else if (half === '2') halfFilter = 'AND me.elapsed_seconds >= 1800';
+
+  const events = db.prepare(`
+    SELECT me.team, me.elapsed_seconds, m.is_home_game
+    FROM match_events me
+    JOIN matches m ON me.match_id = m.id
+    WHERE me.type IN ('Goal', 'SevenMeterGoal')
+      AND me.elapsed_seconds IS NOT NULL
+      AND m.state = 'Post'
+      ${locationFilter}
+      ${halfFilter}
+  `).all();
+
+  if (events.length === 0) {
+    return res.json({ powerPhase: null, deathPhase: null });
+  }
+
+  // Rolling 5-minute window: start 0..55
+  const maxStart = 55;
+  const windowSecs = 300;
+  let best = null, worst = null;
+
+  for (let start = 0; start <= maxStart; start++) {
+    const startSec = start * 60;
+    const endSec = startSec + windowSecs;
+    const inWindow = events.filter(
+      (e) => e.elapsed_seconds >= startSec && e.elapsed_seconds < endSec,
+    );
+    let wolfGoals = 0, oppGoals = 0;
+    for (const e of inWindow) {
+      const wolfTeam = e.is_home_game ? 'Home' : 'Away';
+      if (e.team === wolfTeam) wolfGoals++;
+      else oppGoals++;
+    }
+    const net = wolfGoals - oppGoals;
+    const entry = { start, end: start + 5, wolfGoals, oppGoals, net };
+    if (!best || net > best.net || (net === best.net && wolfGoals > best.wolfGoals)) best = entry;
+    if (!worst || net < worst.net || (net === worst.net && oppGoals > worst.oppGoals)) worst = entry;
+  }
+
+  res.json({ powerPhase: best, deathPhase: worst });
+});
+
+// GET /api/stats/form - per-game data for form curve (chronological)
+router.get('/form', (req, res) => {
+  const db = getDb();
+  const matches = db.prepare(`
+    SELECT id, home_team_name, away_team_name, home_goals, away_goals, is_home_game, starts_at
+    FROM matches
+    WHERE state = 'Post' AND home_goals IS NOT NULL
+    ORDER BY starts_at ASC
+  `).all();
+
+  let cumPoints = 0;
+  const result = matches.map((m, i) => {
+    const own = m.is_home_game ? m.home_goals : m.away_goals;
+    const opp = m.is_home_game ? m.away_goals : m.home_goals;
+    const diff = own - opp;
+    let result, points;
+    if (own > opp) { result = 'win'; points = 2; }
+    else if (own === opp) { result = 'draw'; points = 1; }
+    else { result = 'loss'; points = 0; }
+    cumPoints += points;
+    return {
+      matchId: m.id,
+      date: m.starts_at,
+      opponent: m.is_home_game ? m.away_team_name : m.home_team_name,
+      own,
+      opp,
+      diff,
+      result,
+      points,
+      cumulativePoints: cumPoints,
+      gameIndex: i + 1,
+    };
+  });
+
+  res.json(result);
+});
+
+// GET /api/stats/goals-trend - goals scored vs conceded per game, with half filter
+// Query params: location=home|away|all, half=1|2|all
+router.get('/goals-trend', (req, res) => {
+  const db = getDb();
+  const { location = 'all', half = 'all' } = req.query;
+
+  let locationFilter = '';
+  if (location === 'home') locationFilter = 'AND is_home_game = 1';
+  else if (location === 'away') locationFilter = 'AND is_home_game = 0';
+
+  const matches = db.prepare(`
+    SELECT id, home_team_name, away_team_name, home_goals, away_goals,
+           home_goals_half, away_goals_half, is_home_game, starts_at, state
+    FROM matches
+    WHERE state = 'Post' AND home_goals IS NOT NULL
+      ${locationFilter}
+    ORDER BY starts_at ASC
+  `).all();
+
+  const result = matches.map((m, i) => {
+    let own, opp;
+    if (half === '1') {
+      const ownHalf = m.is_home_game ? m.home_goals_half : m.away_goals_half;
+      const oppHalf = m.is_home_game ? m.away_goals_half : m.home_goals_half;
+      own = ownHalf ?? null;
+      opp = oppHalf ?? null;
+    } else if (half === '2') {
+      const ownTotal = m.is_home_game ? m.home_goals : m.away_goals;
+      const oppTotal = m.is_home_game ? m.away_goals : m.home_goals;
+      const ownHalf = m.is_home_game ? m.home_goals_half : m.away_goals_half;
+      const oppHalf = m.is_home_game ? m.away_goals_half : m.home_goals_half;
+      own = (ownHalf != null && ownTotal != null) ? ownTotal - ownHalf : null;
+      opp = (oppHalf != null && oppTotal != null) ? oppTotal - oppHalf : null;
+    } else {
+      own = m.is_home_game ? m.home_goals : m.away_goals;
+      opp = m.is_home_game ? m.away_goals : m.home_goals;
+    }
+    return {
+      matchId: m.id,
+      date: m.starts_at,
+      opponent: m.is_home_game ? m.away_team_name : m.home_team_name,
+      own,
+      opp,
+      gameIndex: i + 1,
+    };
+  });
+
+  res.json(result);
+});
+
 module.exports = router;
