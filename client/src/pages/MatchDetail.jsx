@@ -182,6 +182,33 @@ function analyzePenaltySessions(events, isHomeGame) {
   });
 }
 
+function detectMatchPhaseExtremes(events, isHomeGame) {
+  const wolfTeam = isHomeGame === 1 ? 'Home' : 'Away';
+  const goals = events.filter(
+    (e) => ['Goal', 'SevenMeterGoal'].includes(e.type) && e.elapsed_seconds != null,
+  );
+  if (goals.length === 0) return null;
+
+  let best = null, worst = null;
+  for (let start = 0; start <= 55; start++) {
+    const startSec = start * 60;
+    const endSec = startSec + 300;
+    const inWindow = goals.filter((e) => e.elapsed_seconds >= startSec && e.elapsed_seconds < endSec);
+    if (inWindow.length === 0) continue;
+    let wolfGoals = 0, oppGoals = 0;
+    for (const e of inWindow) {
+      if (e.team === wolfTeam) wolfGoals++; else oppGoals++;
+    }
+    const net = wolfGoals - oppGoals;
+    const entry = { start, end: start + 5, wolfGoals, oppGoals, net };
+    if (!best || net > best.net || (net === best.net && wolfGoals > best.wolfGoals)) best = entry;
+    if (!worst || net < worst.net || (net === worst.net && oppGoals > worst.oppGoals)) worst = entry;
+  }
+  // Only return if there's a meaningful difference
+  if (!best || !worst || best.start === worst.start) return null;
+  return { powerPhase: best.net >= 0 ? best : null, deathPhase: worst.net <= 0 ? worst : null };
+}
+
 function buildPlayerStats(events, isHomeGame) {
   const wolfTeam = isHomeGame === 1 ? 'Home' : 'Away';
   const map = {};
@@ -324,6 +351,7 @@ function TabAnalyse({ events, match }) {
   const halftime = getHalftimeFromEvents(events);
   const timeouts = analyzeTimeouts(events);
   const penaltySessions = analyzePenaltySessions(events, match.is_home_game);
+  const phaseExtremes = detectMatchPhaseExtremes(events, match.is_home_game);
   const wolfTeam = match.is_home_game ? 'Home' : 'Away';
 
   const finalHome = match.home_goals ?? 0;
@@ -343,6 +371,54 @@ function TabAnalyse({ events, match }) {
           awayTeamName={match.away_team_name}
         />
       </div>
+
+      {/* Power / Death Phase */}
+      {phaseExtremes && (phaseExtremes.powerPhase || phaseExtremes.deathPhase) && (
+        <div className="grid grid-cols-2 gap-3">
+          {phaseExtremes.powerPhase && (
+            <div className="rounded-lg p-3 border bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800/40">
+              <div className="text-xs font-semibold text-green-600 dark:text-green-400 mb-2">
+                ⚡ Power-Phase {phaseExtremes.powerPhase.start}′–{phaseExtremes.powerPhase.end}′
+              </div>
+              <div className="space-y-1 text-xs">
+                <div className="flex justify-between">
+                  <span className="text-gray-600 dark:text-gray-400">Wolf-Tore</span>
+                  <span className="font-medium text-green-400">{phaseExtremes.powerPhase.wolfGoals}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600 dark:text-gray-400">Gegentore</span>
+                  <span className="font-medium text-red-400">{phaseExtremes.powerPhase.oppGoals}</span>
+                </div>
+                <div className="flex justify-between border-t border-green-200 dark:border-green-800/40 pt-1">
+                  <span className="text-gray-600 dark:text-gray-400">Netto</span>
+                  <span className="font-bold text-green-400">+{phaseExtremes.powerPhase.net}</span>
+                </div>
+              </div>
+            </div>
+          )}
+          {phaseExtremes.deathPhase && (
+            <div className="rounded-lg p-3 border bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800/40">
+              <div className="text-xs font-semibold text-red-600 dark:text-red-400 mb-2">
+                ⚠ Schwächephase {phaseExtremes.deathPhase.start}′–{phaseExtremes.deathPhase.end}′
+              </div>
+              <div className="space-y-1 text-xs">
+                <div className="flex justify-between">
+                  <span className="text-gray-600 dark:text-gray-400">Wolf-Tore</span>
+                  <span className="font-medium text-green-400">{phaseExtremes.deathPhase.wolfGoals}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600 dark:text-gray-400">Gegentore</span>
+                  <span className="font-medium text-red-400">{phaseExtremes.deathPhase.oppGoals}</span>
+                </div>
+                <div className="flex justify-between border-t border-red-200 dark:border-red-800/40 pt-1">
+                  <span className="text-gray-600 dark:text-gray-400">Netto</span>
+                  <span className="font-bold text-red-400">{phaseExtremes.deathPhase.net}</span>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Halftime comparison */}
       {halftime && (
