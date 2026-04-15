@@ -184,29 +184,53 @@ function analyzePenaltySessions(events, isHomeGame) {
 
 function detectMatchPhaseExtremes(events, isHomeGame) {
   const wolfTeam = isHomeGame === 1 ? 'Home' : 'Away';
-  const goals = events.filter(
-    (e) => ['Goal', 'SevenMeterGoal'].includes(e.type) && e.elapsed_seconds != null,
-  );
-  if (goals.length === 0) return null;
+  const goals = events
+    .filter((e) => ['Goal', 'SevenMeterGoal'].includes(e.type) && e.elapsed_seconds != null)
+    .sort((a, b) => a.elapsed_seconds - b.elapsed_seconds);
+  if (goals.length < 2) return null;
 
-  let best = null, worst = null;
-  for (let start = 0; start <= 55; start++) {
-    const startSec = start * 60;
-    const endSec = startSec + 300;
-    const inWindow = goals.filter((e) => e.elapsed_seconds >= startSec && e.elapsed_seconds < endSec);
-    if (inWindow.length === 0) continue;
-    let wolfGoals = 0, oppGoals = 0;
-    for (const e of inWindow) {
-      if (e.team === wolfTeam) wolfGoals++; else oppGoals++;
+  // Build sequence: +1 for Wolfschlugen goal, -1 for opponent goal
+  const seq = goals.map((e) => ({
+    value: e.team === wolfTeam ? 1 : -1,
+    minute: Math.ceil(e.elapsed_seconds / 60),
+  }));
+
+  // Kadane's algorithm for max and min subarray
+  function kadane(arr, findMax) {
+    let bestSum = findMax ? -Infinity : Infinity;
+    let bestStart = 0, bestEnd = 0;
+    let curSum = 0, curStart = 0;
+    for (let i = 0; i < arr.length; i++) {
+      curSum += arr[i].value;
+      const better = findMax ? curSum > bestSum : curSum < bestSum;
+      if (better) {
+        bestSum = curSum;
+        bestStart = curStart;
+        bestEnd = i;
+      }
+      const resetBetter = findMax ? curSum < 0 : curSum > 0;
+      if (resetBetter) { curSum = 0; curStart = i + 1; }
     }
-    const net = wolfGoals - oppGoals;
-    const entry = { start, end: start + 5, wolfGoals, oppGoals, net };
-    if (!best || net > best.net || (net === best.net && wolfGoals > best.wolfGoals)) best = entry;
-    if (!worst || net < worst.net || (net === worst.net && oppGoals > worst.oppGoals)) worst = entry;
+    if (!isFinite(bestSum)) return null;
+    const subSeq = arr.slice(bestStart, bestEnd + 1);
+    const wolf = subSeq.filter((s) => s.value === 1).length;
+    const opp = subSeq.filter((s) => s.value === -1).length;
+    return {
+      startMinute: arr[bestStart].minute,
+      endMinute: arr[bestEnd].minute,
+      wolfGoals: wolf,
+      oppGoals: opp,
+      net: bestSum,
+    };
   }
-  // Only return if there's a meaningful difference
-  if (!best || !worst || best.start === worst.start) return null;
-  return { powerPhase: best.net >= 0 ? best : null, deathPhase: worst.net <= 0 ? worst : null };
+
+  const power = kadane(seq, true);
+  const death = kadane(seq, false);
+
+  return {
+    powerPhase: power && power.net > 0 ? power : null,
+    deathPhase: death && death.net < 0 ? death : null,
+  };
 }
 
 function buildPlayerStats(events, isHomeGame) {
@@ -378,11 +402,14 @@ function TabAnalyse({ events, match }) {
           {phaseExtremes.powerPhase && (
             <div className="rounded-lg p-3 border bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800/40">
               <div className="text-xs font-semibold text-green-600 dark:text-green-400 mb-2">
-                ⚡ Power-Phase {phaseExtremes.powerPhase.start}′–{phaseExtremes.powerPhase.end}′
+                Stärkste Phase
+              </div>
+              <div className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                {phaseExtremes.powerPhase.startMinute}. – {phaseExtremes.powerPhase.endMinute}. Minute
               </div>
               <div className="space-y-1 text-xs">
                 <div className="flex justify-between">
-                  <span className="text-gray-600 dark:text-gray-400">Wolf-Tore</span>
+                  <span className="text-gray-600 dark:text-gray-400">Wolfschl. Tore</span>
                   <span className="font-medium text-green-400">{phaseExtremes.powerPhase.wolfGoals}</span>
                 </div>
                 <div className="flex justify-between">
@@ -399,11 +426,14 @@ function TabAnalyse({ events, match }) {
           {phaseExtremes.deathPhase && (
             <div className="rounded-lg p-3 border bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800/40">
               <div className="text-xs font-semibold text-red-600 dark:text-red-400 mb-2">
-                ⚠ Schwächephase {phaseExtremes.deathPhase.start}′–{phaseExtremes.deathPhase.end}′
+                Schwächste Phase
+              </div>
+              <div className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                {phaseExtremes.deathPhase.startMinute}. – {phaseExtremes.deathPhase.endMinute}. Minute
               </div>
               <div className="space-y-1 text-xs">
                 <div className="flex justify-between">
-                  <span className="text-gray-600 dark:text-gray-400">Wolf-Tore</span>
+                  <span className="text-gray-600 dark:text-gray-400">Wolfschl. Tore</span>
                   <span className="font-medium text-green-400">{phaseExtremes.deathPhase.wolfGoals}</span>
                 </div>
                 <div className="flex justify-between">

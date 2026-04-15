@@ -259,12 +259,15 @@ export default function Team() {
             <div className="grid grid-cols-2 gap-4">
               {phaseExtremes.powerPhase && (
                 <div className="rounded-lg p-4 border bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800/40">
-                  <div className="text-xs font-semibold text-green-600 dark:text-green-400 mb-2">
-                    ⚡ Power-Phase {phaseExtremes.powerPhase.start}′–{phaseExtremes.powerPhase.end}′
+                  <div className="text-xs font-semibold text-green-600 dark:text-green-400 mb-1">
+                    Stärkste Phase
+                  </div>
+                  <div className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                    {phaseExtremes.powerPhase.start}. – {phaseExtremes.powerPhase.end}. Minute
                   </div>
                   <div className="space-y-1 text-xs">
                     <div className="flex justify-between">
-                      <span className="text-gray-600 dark:text-gray-400">Wolf-Tore</span>
+                      <span className="text-gray-600 dark:text-gray-400">Wolfschl. Tore</span>
                       <span className="font-medium text-green-400">{phaseExtremes.powerPhase.wolfGoals}</span>
                     </div>
                     <div className="flex justify-between">
@@ -280,12 +283,15 @@ export default function Team() {
               )}
               {phaseExtremes.deathPhase && (
                 <div className="rounded-lg p-4 border bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800/40">
-                  <div className="text-xs font-semibold text-red-600 dark:text-red-400 mb-2">
-                    ⚠ Schwächephase {phaseExtremes.deathPhase.start}′–{phaseExtremes.deathPhase.end}′
+                  <div className="text-xs font-semibold text-red-600 dark:text-red-400 mb-1">
+                    Schwächste Phase
+                  </div>
+                  <div className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                    {phaseExtremes.deathPhase.start}. – {phaseExtremes.deathPhase.end}. Minute
                   </div>
                   <div className="space-y-1 text-xs">
                     <div className="flex justify-between">
-                      <span className="text-gray-600 dark:text-gray-400">Wolf-Tore</span>
+                      <span className="text-gray-600 dark:text-gray-400">Wolfschl. Tore</span>
                       <span className="font-medium text-green-400">{phaseExtremes.deathPhase.wolfGoals}</span>
                     </div>
                     <div className="flex justify-between">
@@ -334,7 +340,7 @@ export default function Team() {
                 })}
               </div>
               <div className="flex gap-4 mt-3 text-xs text-gray-400 dark:text-gray-500">
-                <span className="flex items-center gap-1"><span className="w-3 h-2 bg-green-600 rounded-sm inline-block" /> TSV Wolfschlugen</span>
+                <span className="flex items-center gap-1"><span className="w-3 h-2 bg-green-600 rounded-sm inline-block" /> Wolfschlugen</span>
                 <span className="flex items-center gap-1"><span className="w-3 h-2 bg-red-700 rounded-sm inline-block" /> Gegner</span>
               </div>
             </div>
