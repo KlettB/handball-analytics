@@ -9,6 +9,13 @@ function formatDate(ts) {
   });
 }
 
+function formatTime(ts) {
+  return new Date(ts).toLocaleTimeString('de-DE', {
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
 function computeStats(matches) {
   const finished = matches.filter((m) => m.state === 'Post' && m.home_goals != null);
   let wins = 0, draws = 0, losses = 0, goalsFor = 0, goalsAgainst = 0;
@@ -79,7 +86,7 @@ export default function Dashboard() {
   const stats = computeStats(matches);
   const finished = matches.filter((m) => m.state === 'Post' && m.home_goals != null);
   const recentFive = [...finished].slice(0, 5);
-  const upcoming = matches.filter((m) => m.state !== 'Post').slice(-3).reverse();
+  const upcoming = matches.filter((m) => m.state !== 'Post').slice(-5).reverse();
 
   const formData = [...finished]
     .sort((a, b) => new Date(a.starts_at) - new Date(b.starts_at))
@@ -231,12 +238,19 @@ export default function Dashboard() {
           <div className="space-y-2">
             {upcoming.map((m) => {
               const opponent = m.is_home_game ? m.away_team_name : m.home_team_name;
-              const venue = m.is_home_game ? 'Heim' : 'Auswärts';
+              const isHome = m.is_home_game === 1;
               return (
-                <div key={m.id} className="flex items-center gap-3 text-sm">
+                <div key={m.id} className="flex items-center gap-3">
+                  <span className={`w-6 h-6 rounded text-xs font-bold flex items-center justify-center shrink-0 border-2 bg-transparent ${
+                    isHome
+                      ? 'border-green-500 text-green-500'
+                      : 'border-red-500 text-red-500'
+                  }`}>
+                    {isHome ? 'H' : 'A'}
+                  </span>
                   <span className="text-xs text-gray-400 dark:text-gray-500 w-24 shrink-0">{formatDate(m.starts_at)}</span>
-                  <span className="flex-1 truncate">{opponent}</span>
-                  <span className="text-xs text-gray-400 dark:text-gray-500">{venue}</span>
+                  <span className="flex-1 truncate text-sm">{opponent}</span>
+                  <span className="text-sm font-medium text-gray-400 dark:text-gray-500 whitespace-nowrap shrink-0">{formatTime(m.starts_at)}</span>
                 </div>
               );
             })}
