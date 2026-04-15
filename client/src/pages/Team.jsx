@@ -41,12 +41,72 @@ function buildOpponentStats(finished) {
     .sort((a, b) => b.net - a.net);
 }
 
+function FilterToggle({ options, value, onChange }) {
+  return (
+    <div className="flex rounded-lg overflow-hidden border border-gray-700 text-xs">
+      {options.map((o) => (
+        <button
+          key={o.value}
+          onClick={() => onChange(o.value)}
+          className={`px-3 py-1.5 transition-colors ${
+            value === o.value
+              ? 'bg-gray-600 text-white'
+              : 'bg-gray-800 text-gray-400 hover:text-white'
+          }`}
+        >
+          {o.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function PowerplayCard({ label, data, color, bg, border }) {
+  if (!data) return null;
+  return (
+    <div className={`rounded-lg p-4 border ${bg} ${border}`}>
+      <div className={`font-semibold mb-3 ${color}`}>{label}</div>
+      <div className="space-y-1.5 text-xs">
+        <div className="flex justify-between text-gray-400">
+          <span>Situationen</span>
+          <span className="font-medium text-white">{data.total}</span>
+        </div>
+        <div className="flex justify-between text-gray-400">
+          <span>Tore erzielt</span>
+          <span className="font-medium text-green-400">{data.goals}</span>
+        </div>
+        <div className="flex justify-between text-gray-400">
+          <span>Tore kassiert</span>
+          <span className="font-medium text-red-400">{data.conceded}</span>
+        </div>
+        <div className="border-t border-gray-700 pt-1.5 flex justify-between gap-2 text-gray-500">
+          <span className="text-green-400">{data.won}× gewonnen</span>
+          <span>{data.neutral}× neutral</span>
+          <span className="text-red-400">{data.lost}× verloren</span>
+        </div>
+        {data.total > 0 && (
+          <div className="flex justify-between text-gray-400">
+            <span>Gewinnquote</span>
+            <span className={data.won / data.total >= 0.5 ? 'text-green-400' : 'text-red-400'}>
+              {((data.won / data.total) * 100).toFixed(0)}% ({data.won}/{data.total})
+            </span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function Team() {
   const [matches, setMatches] = useState([]);
   const [phases, setPhases] = useState([]);
   const [powerplay, setPowerplay] = useState(null);
   const [comebacks, setComebacks] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState('uebersicht');
+  const [filterLocation, setFilterLocation] = useState('all');
+  const [filterHalf, setFilterHalf] = useState('all');
+  const [filterLoading, setFilterLoading] = useState(false);
 
   useEffect(() => {
     Promise.all([
@@ -64,6 +124,22 @@ export default function Team() {
       .catch(console.error)
       .finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => {
+    if (activeTab !== 'phasen') return;
+    setFilterLoading(true);
+    const params = new URLSearchParams({ location: filterLocation, half: filterHalf });
+    Promise.all([
+      fetch(`/api/stats/phases?${params}`).then((r) => r.json()),
+      fetch(`/api/stats/powerplay?${params}`).then((r) => r.json()),
+    ])
+      .then(([p, pp]) => {
+        setPhases(p);
+        setPowerplay(pp);
+      })
+      .catch(console.error)
+      .finally(() => setFilterLoading(false));
+  }, [filterLocation, filterHalf, activeTab]);
 
   if (loading) {
     return (
@@ -99,16 +175,148 @@ export default function Team() {
 
   const opponents = buildOpponentStats(finished);
 
-  const maxPhaseVal = phases.length
-    ? Math.max(...phases.map((p) => Math.max(p.wolfGoals, p.oppGoals)))
-    : 1;
-
   return (
     <div className="max-w-2xl mx-auto px-4 py-6 space-y-6">
       <div>
         <h1 className="text-xl font-bold">Teamanalyse</h1>
         <p className="text-sm text-gray-400 mt-0.5">Saison 2025/26 · TSV Wolfschlugen</p>
       </div>
+
+      {/* Tabs */}
+      <div className="flex border-b border-gray-700">
+        {[
+          { id: 'uebersicht', label: 'Übersicht' },
+          { id: 'phasen', label: 'Phasenanalyse' },
+        ].map((tab) => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px ${
+              activeTab === tab.id
+                ? 'border-white text-white'
+                : 'border-transparent text-gray-400 hover:text-white'
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {activeTab === 'phasen' && (
+        <div className="space-y-6">
+          {/* Filters */}
+          <div className="flex flex-wrap gap-3 items-center">
+            <FilterToggle
+              options={[
+                { value: 'all', label: 'Alle Spiele' },
+                { value: 'home', label: 'Heim' },
+                { value: 'away', label: 'Auswärts' },
+              ]}
+              value={filterLocation}
+              onChange={setFilterLocation}
+            />
+            <FilterToggle
+              options={[
+                { value: 'all', label: 'Beide HZ' },
+                { value: '1', label: '1. Halbzeit' },
+                { value: '2', label: '2. Halbzeit' },
+              ]}
+              value={filterHalf}
+              onChange={setFilterHalf}
+            />
+            {filterLoading && <span className="text-xs text-gray-500">Lädt...</span>}
+          </div>
+
+          {/* Schwächephasen */}
+          {phases.length > 0 && (
+            <div className="bg-gray-800 rounded-lg p-5">
+              <h2 className="text-sm text-gray-400 uppercase tracking-wide mb-1">Schwächephasen</h2>
+              <p className="text-xs text-gray-500 mb-4">Tore pro 5-Minuten-Block</p>
+              <div className="space-y-1.5">
+                {phases.map((p) => {
+                  const maxVal = Math.max(...phases.map((x) => Math.max(x.wolfGoals, x.oppGoals)), 1);
+                  const wolfW = Math.round((p.wolfGoals / maxVal) * 100);
+                  const oppW = Math.round((p.oppGoals / maxVal) * 100);
+                  const netColor = p.net > 0 ? 'text-green-400' : p.net < 0 ? 'text-red-400' : 'text-gray-500';
+                  return (
+                    <div key={p.block} className="flex items-center gap-2 text-xs">
+                      <span className="w-14 text-right text-gray-500 shrink-0">{p.label}</span>
+                      <div className="flex-1 flex flex-col gap-0.5">
+                        <div className="flex items-center gap-1">
+                          <div className="h-3 bg-green-600 rounded-sm" style={{ width: `${wolfW}%`, minWidth: wolfW > 0 ? 4 : 0 }} />
+                          <span className="text-gray-400">{p.wolfGoals}</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <div className="h-3 bg-red-700 rounded-sm" style={{ width: `${oppW}%`, minWidth: oppW > 0 ? 4 : 0 }} />
+                          <span className="text-gray-500">{p.oppGoals}</span>
+                        </div>
+                      </div>
+                      <span className={`w-8 text-right font-bold shrink-0 ${netColor}`}>
+                        {p.net > 0 ? `+${p.net}` : p.net}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="flex gap-4 mt-3 text-xs text-gray-500">
+                <span className="flex items-center gap-1"><span className="w-3 h-2 bg-green-600 rounded-sm inline-block" /> TSV Wolfschlugen</span>
+                <span className="flex items-center gap-1"><span className="w-3 h-2 bg-red-700 rounded-sm inline-block" /> Gegner</span>
+              </div>
+            </div>
+          )}
+
+          {/* Über-/Unterzahl + Gleichzahl */}
+          {powerplay && (
+            <div className="bg-gray-800 rounded-lg p-5 space-y-4">
+              <h2 className="text-sm text-gray-400 uppercase tracking-wide">Über-/Unterzahl</h2>
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <PowerplayCard label="Überzahl" data={powerplay.ueberzahl} color="text-green-400" border="border-green-800/40" bg="bg-green-900/20" />
+                <PowerplayCard label="Unterzahl" data={powerplay.unterzahl} color="text-red-400" border="border-red-800/40" bg="bg-red-900/20" />
+              </div>
+              <h2 className="text-sm text-gray-400 uppercase tracking-wide pt-2 border-t border-gray-700">Gleichzahl</h2>
+              <p className="text-xs text-gray-500 -mt-2">Tore außerhalb von Über-/Unterzahl-Fenstern</p>
+              {(() => {
+                const gz = powerplay.gleichzahl;
+                const total = gz.goals + gz.conceded;
+                const ratio = total > 0 ? ((gz.goals / total) * 100).toFixed(0) : null;
+                const barW = total > 0 ? (gz.goals / total) * 100 : 50;
+                return (
+                  <div className="rounded-lg p-4 border bg-blue-900/20 border-blue-800/40 text-xs">
+                    <div className="grid grid-cols-3 gap-3 mb-3 text-center">
+                      <div>
+                        <div className="text-lg font-bold text-green-400">{gz.goals}</div>
+                        <div className="text-gray-500">Tore erzielt</div>
+                      </div>
+                      <div>
+                        <div className="text-lg font-bold text-white">{total}</div>
+                        <div className="text-gray-500">Gesamt</div>
+                      </div>
+                      <div>
+                        <div className="text-lg font-bold text-red-400">{gz.conceded}</div>
+                        <div className="text-gray-500">Tore kassiert</div>
+                      </div>
+                    </div>
+                    {ratio && (
+                      <>
+                        <div className="flex rounded-full overflow-hidden h-2 mb-1.5">
+                          <div className="bg-green-500" style={{ width: `${barW}%` }} />
+                          <div className="bg-red-700 flex-1" />
+                        </div>
+                        <div className="flex justify-between text-gray-500">
+                          <span className="text-green-400 font-medium">{ratio}% Wolf</span>
+                          <span className="text-red-400 font-medium">{100 - Number(ratio)}% Gegner</span>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                );
+              })()}
+            </div>
+          )}
+        </div>
+      )}
+
+      {activeTab === 'uebersicht' && <div className="space-y-6">
 
       {/* Overall stats */}
       <div className="bg-gray-800 rounded-lg p-5">
@@ -182,112 +390,6 @@ export default function Team() {
                 <div key={`${label}-h`} className="text-center py-2 border-t border-gray-700 font-medium">{h}</div>
                 <div key={`${label}-a`} className="text-center py-2 border-t border-gray-700 font-medium">{a}</div>
               </>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Schwächephasen */}
-      {phases.length > 0 && (
-        <div className="bg-gray-800 rounded-lg p-5">
-          <h2 className="text-sm text-gray-400 uppercase tracking-wide mb-1">Schwächephasen</h2>
-          <p className="text-xs text-gray-500 mb-4">
-            Tore pro 5-Minuten-Block über alle Spiele
-          </p>
-          <div className="space-y-1.5">
-            {phases.map((p) => {
-              const wolfW = Math.round((p.wolfGoals / maxPhaseVal) * 100);
-              const oppW = Math.round((p.oppGoals / maxPhaseVal) * 100);
-              const netColor =
-                p.net > 0 ? 'text-green-400' : p.net < 0 ? 'text-red-400' : 'text-gray-500';
-              return (
-                <div key={p.block} className="flex items-center gap-2 text-xs">
-                  <span className="w-14 text-right text-gray-500 shrink-0">{p.label}</span>
-                  <div className="flex-1 flex flex-col gap-0.5">
-                    <div className="flex items-center gap-1">
-                      <div
-                        className="h-3 bg-green-600 rounded-sm"
-                        style={{ width: `${wolfW}%`, minWidth: wolfW > 0 ? 4 : 0 }}
-                      />
-                      <span className="text-gray-400">{p.wolfGoals}</span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <div
-                        className="h-3 bg-red-700 rounded-sm"
-                        style={{ width: `${oppW}%`, minWidth: oppW > 0 ? 4 : 0 }}
-                      />
-                      <span className="text-gray-500">{p.oppGoals}</span>
-                    </div>
-                  </div>
-                  <span className={`w-8 text-right font-bold shrink-0 ${netColor}`}>
-                    {p.net > 0 ? `+${p.net}` : p.net}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-          <div className="flex gap-4 mt-3 text-xs text-gray-500">
-            <span className="flex items-center gap-1">
-              <span className="w-3 h-2 bg-green-600 rounded-sm inline-block" /> TSV Wolfschlugen
-            </span>
-            <span className="flex items-center gap-1">
-              <span className="w-3 h-2 bg-red-700 rounded-sm inline-block" /> Gegner
-            </span>
-          </div>
-        </div>
-      )}
-
-      {/* Über-/Unterzahl */}
-      {powerplay && (
-        <div className="bg-gray-800 rounded-lg p-5">
-          <h2 className="text-sm text-gray-400 uppercase tracking-wide mb-4">Über-/Unterzahl</h2>
-          <div className="grid grid-cols-2 gap-4 text-sm">
-            {[
-              {
-                label: 'Überzahl',
-                data: powerplay.ueberzahl,
-                color: 'text-green-400',
-                border: 'border-green-800/40',
-                bg: 'bg-green-900/20',
-              },
-              {
-                label: 'Unterzahl',
-                data: powerplay.unterzahl,
-                color: 'text-red-400',
-                border: 'border-red-800/40',
-                bg: 'bg-red-900/20',
-              },
-            ].map(({ label, data, color, border, bg }) => (
-              <div key={label} className={`rounded-lg p-4 border ${bg} ${border}`}>
-                <div className={`font-semibold mb-3 ${color}`}>{label}</div>
-                <div className="space-y-1.5 text-xs">
-                  <div className="flex justify-between text-gray-400">
-                    <span>Situationen</span>
-                    <span className="font-medium text-white">{data.total}</span>
-                  </div>
-                  <div className="flex justify-between text-gray-400">
-                    <span>Tore erzielt</span>
-                    <span className="font-medium text-green-400">{data.goals}</span>
-                  </div>
-                  <div className="flex justify-between text-gray-400">
-                    <span>Tore kassiert</span>
-                    <span className="font-medium text-red-400">{data.conceded}</span>
-                  </div>
-                  <div className="border-t border-gray-700 pt-1.5 flex justify-between gap-2 text-gray-500">
-                    <span className="text-green-400">{data.won}× gewonnen</span>
-                    <span>{data.neutral}× neutral</span>
-                    <span className="text-red-400">{data.lost}× verloren</span>
-                  </div>
-                  {data.total > 0 && (
-                    <div className="flex justify-between text-gray-400">
-                      <span>Gewinnquote</span>
-                      <span className={data.won / data.total >= 0.5 ? 'text-green-400' : 'text-red-400'}>
-                        {((data.won / data.total) * 100).toFixed(0)}% ({data.won}/{data.total})
-                      </span>
-                    </div>
-                  )}
-                </div>
-              </div>
             ))}
           </div>
         </div>
@@ -414,6 +516,7 @@ export default function Team() {
           <p className="text-xs text-gray-600 mt-2">Klickbar · Zahl = max. Rückstand</p>
         </div>
       )}
+      </div>}
     </div>
   );
 }
