@@ -250,7 +250,7 @@ export default function Dashboard() {
                   </span>
                   <span className="text-xs text-gray-400 dark:text-gray-500 w-24 shrink-0">{formatDate(m.starts_at)}</span>
                   <span className="flex-1 truncate text-sm">{opponent}</span>
-                  <span className="text-sm font-medium text-gray-400 dark:text-gray-500 whitespace-nowrap shrink-0">{formatTime(m.starts_at)}</span>
+                  <span className="text-sm font-medium text-gray-400 dark:text-gray-500 whitespace-nowrap shrink-0">{formatTime(m.starts_at)} Uhr</span>
                 </div>
               );
             })}
