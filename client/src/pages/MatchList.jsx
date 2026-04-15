@@ -23,8 +23,6 @@ export default function MatchList() {
   const [matches, setMatches] = useState([]);
   const [standings, setStandings] = useState({});
   const [loading, setLoading] = useState(true);
-  const [fetching, setFetching] = useState(false);
-
   useEffect(() => {
     Promise.all([
       fetch('/api/matches').then((r) => r.json()),
@@ -41,19 +39,6 @@ export default function MatchList() {
       .finally(() => setLoading(false));
   }, []);
 
-  async function triggerFetch() {
-    setFetching(true);
-    try {
-      await fetch('/api/fetch-data', { method: 'POST' });
-      const res = await fetch('/api/matches');
-      setMatches(await res.json());
-    } catch (err) {
-      console.error('Fetch failed:', err);
-    } finally {
-      setFetching(false);
-    }
-  }
-
   if (loading) {
     return (
       <div className="flex items-center justify-center py-24">
@@ -66,26 +51,12 @@ export default function MatchList() {
     <div className="max-w-2xl mx-auto px-4 py-6">
       {matches.length === 0 ? (
         <div className="text-center py-12">
-          <p className="text-gray-500 dark:text-gray-400 mb-4">Noch keine Spieldaten vorhanden.</p>
-          <button
-            onClick={triggerFetch}
-            disabled={fetching}
-            className="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-white rounded hover:bg-gray-300 dark:hover:bg-gray-600 disabled:opacity-50"
-          >
-            {fetching ? 'Daten werden geladen...' : 'Daten laden'}
-          </button>
+          <p className="text-gray-500 dark:text-gray-400">Noch keine Spieldaten vorhanden.</p>
         </div>
       ) : (
         <>
-          <div className="flex justify-between items-center mb-4">
+          <div className="mb-4">
             <span className="text-sm text-gray-500 dark:text-gray-400">{matches.length} Spiele</span>
-            <button
-              onClick={triggerFetch}
-              disabled={fetching}
-              className="text-sm px-3 py-1 border border-gray-300 dark:border-gray-600 rounded hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-50"
-            >
-              {fetching ? 'Läuft...' : 'Aktualisieren'}
-            </button>
           </div>
           <div className="space-y-2">
             {matches.map((m) => (
