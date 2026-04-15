@@ -57,6 +57,22 @@ function initSchema() {
 
     CREATE INDEX IF NOT EXISTS idx_events_match ON match_events(match_id);
     CREATE INDEX IF NOT EXISTS idx_matches_starts ON matches(starts_at);
+
+    CREATE TABLE IF NOT EXISTS standings (
+      team_id   TEXT PRIMARY KEY,
+      team_name TEXT NOT NULL,
+      rank      INTEGER NOT NULL,
+      games     INTEGER NOT NULL DEFAULT 0,
+      wins      INTEGER NOT NULL DEFAULT 0,
+      draws     INTEGER NOT NULL DEFAULT 0,
+      losses    INTEGER NOT NULL DEFAULT 0,
+      goals_for     INTEGER NOT NULL DEFAULT 0,
+      goals_against INTEGER NOT NULL DEFAULT 0,
+      goal_diff     INTEGER NOT NULL DEFAULT 0,
+      points_pos    INTEGER NOT NULL DEFAULT 0,
+      points_neg    INTEGER NOT NULL DEFAULT 0,
+      fetched_at TEXT
+    );
   `);
 }
 

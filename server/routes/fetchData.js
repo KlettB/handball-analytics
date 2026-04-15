@@ -1,5 +1,6 @@
 const express = require('express');
 const { fetchAllGames } = require('../fetcher/index');
+const { fetchStandings } = require('../fetcher/standings');
 
 const router = express.Router();
 
@@ -24,7 +25,10 @@ router.post('/', async (req, res) => {
 
   fetching = true;
   try {
-    const summary = await fetchAllGames(teamId, dateFrom, dateTo);
+    const [summary] = await Promise.all([
+      fetchAllGames(teamId, dateFrom, dateTo),
+      fetchStandings().catch((err) => console.error('[fetch-data] Standings fetch failed:', err.message)),
+    ]);
     res.json(summary);
   } catch (err) {
     res.status(500).json({ error: err.message });

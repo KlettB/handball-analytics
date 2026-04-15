@@ -17,7 +17,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
           <Route path="/" element={<Dashboard />} />
           <Route path="/matches" element={<MatchList />} />
           <Route path="/matches/:id" element={<MatchDetail />} />
-          <Route path="/players" element={<Players />} />
+<Route path="/players" element={<Players />} />
           <Route path="/team" element={<Team />} />
         </Route>
       </Routes>

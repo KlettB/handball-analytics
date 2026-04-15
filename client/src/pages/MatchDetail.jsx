@@ -271,7 +271,7 @@ function TabSpieldverlauf({ events, homeTeamName, awayTeamName }) {
               return (
                 <div
                   key={evt.event_id}
-                  className="grid grid-cols-[44px_1fr_72px_1fr] items-center py-1.5 border-b border-gray-100 dark:border-gray-100 dark:border-gray-700 last:border-0 text-xs"
+                  className="grid grid-cols-[44px_1fr_72px_1fr] items-center py-1.5 border-b border-gray-100 dark:border-gray-700 last:border-0 text-xs"
                 >
                   {/* Time */}
                   <div className="text-gray-400 dark:text-gray-500 font-mono">{evt.time}</div>

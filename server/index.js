@@ -5,9 +5,11 @@ const path = require('path');
 const cron = require('node-cron');
 const { getDb } = require('./db');
 const { fetchAllGames } = require('./fetcher/index');
+const { fetchStandings } = require('./fetcher/standings');
 const matchesRouter = require('./routes/matches');
 const fetchDataRouter = require('./routes/fetchData');
 const statsRouter = require('./routes/stats');
+const standingsRouter = require('./routes/standings');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -23,6 +25,7 @@ getDb();
 app.use('/api/matches', matchesRouter);
 app.use('/api/fetch-data', fetchDataRouter);
 app.use('/api/stats', statsRouter);
+app.use('/api/standings', standingsRouter);
 
 // Health check
 app.get('/api/health', (req, res) => {
@@ -33,11 +36,10 @@ app.get('/api/health', (req, res) => {
 cron.schedule('0 3 * * *', async () => {
   console.log('[cron] Starting nightly data fetch...');
   try {
-    const summary = await fetchAllGames(
-      process.env.TEAM_ID,
-      process.env.SEASON_START,
-      process.env.SEASON_END
-    );
+    const [summary] = await Promise.all([
+      fetchAllGames(process.env.TEAM_ID, process.env.SEASON_START, process.env.SEASON_END),
+      fetchStandings().catch((err) => console.error('[cron] Standings fetch failed:', err.message)),
+    ]);
     console.log('[cron] Nightly data fetch complete:', summary);
   } catch (err) {
     console.error('[cron] Nightly data fetch failed:', err);

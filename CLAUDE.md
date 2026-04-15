@@ -35,11 +35,19 @@ Die Datenbank ist die Source of Truth. Daten-Fetch ersetzt Daten nur bei erfolgr
 | Phase | Thema | Status | Details |
 |-------|-------|--------|---------|
 | 1 | Foundation + MVP | DONE | [docs/phase1.md](docs/phase1.md) |
-| 2 | Einzelspiel-Tiefe | TODO | [docs/phase2.md](docs/phase2.md) |
-| 3 | Saison-Aggregation | TODO | [docs/phase3.md](docs/phase3.md) |
-| 4 | Advanced Analytics + Deploy | TODO | [docs/phase4.md](docs/phase4.md) |
+| 2 | Einzelspiel-Tiefe | DONE | [docs/phase2.md](docs/phase2.md) |
+| 3 | Saison-Aggregation | DONE | [docs/phase3.md](docs/phase3.md) |
+| 4 | Advanced Analytics + Deploy | DONE | [docs/phase4.md](docs/phase4.md) |
+| 5 | Ligatabelle + Spielkontext | TODO | [docs/phase5.md](docs/phase5.md) |
+| 6 | Power-/Death-Phasen + Formkurve | TODO | [docs/phase6.md](docs/phase6.md) |
+| 7 | Liga-wide Data + Gegner-Insights | TODO | [docs/phase7.md](docs/phase7.md) |
 
 **Phasen strikt der Reihe nach abarbeiten. Jede Phase muss funktionieren bevor die nächste beginnt.**
+
+## Nice-to-Have (Future / Nicht priorisiert)
+- Live-Mode: Auto-Refresh während laufender Spiele (`state = 'Live'`)
+- Schiedsrichter-Statistiken (2-Minuten-Quote nach Schiedsrichter)
+- Multi-Saison-Vergleich
 
 ## Referenz-Dokumente
 - [docs/data-source.md](docs/data-source.md) — URL-Patterns, Event-Typen, RSC-Datenstruktur

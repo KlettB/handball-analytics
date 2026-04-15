@@ -3,10 +3,14 @@
 ## Ziel
 Saisonübergreifende Statistiken: Spieler-Stats, Schwächephasen, Heim/Auswärts-Vergleich.
 
-## Features (geplant)
-- Spieler-Statistiken (Tore, 7m, Strafen über die Saison)
-- Schwächephasen-Analyse (in welchen Spielminuten verliert das Team regelmäßig?)
-- Heim vs. Auswärts-Bilanz
-- Gegner-Vergleich
+## Features
 
-## Status: TODO
+- [x] Spieler-Statistiken — Players.jsx (Tore, 7m, Strafen, Spiele, sortierbar)
+- [x] Schwächephasen-Analyse — 5-Minuten-Blöcke, Wolf vs. Gegner, filterbar
+- [x] Heim vs. Auswärts-Bilanz — Team.jsx Übersicht
+- [x] Gegner-Vergleich — Tordifferenz pro Gegner, alle Ergebnisse
+- [x] Über-/Unterzahl Saison-Aggregation (Überzahl / Unterzahl / Gleichzahl)
+- [x] Comeback-Index (Spiele wo Wolf zurücklag und nicht verlor)
+- [x] Größte Siege / Höchste Niederlagen
+
+## Status: DONE

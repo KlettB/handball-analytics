@@ -44,14 +44,26 @@ function resultLabel(m) {
   return 'U';
 }
 
+const WOLF_ID = 'handball4all.baden-wuerttemberg.1331231';
+const TOTAL_TEAMS = 14;
+
+function standingRowClass(rank) {
+  if (rank <= 2) return 'text-green-600 dark:text-green-400';
+  if (rank >= TOTAL_TEAMS - 1) return 'text-red-600 dark:text-red-400';
+  return 'text-gray-600 dark:text-gray-400';
+}
+
 export default function Dashboard() {
   const [matches, setMatches] = useState([]);
+  const [standings, setStandings] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch('/api/matches')
-      .then((r) => r.json())
-      .then(setMatches)
+    Promise.all([
+      fetch('/api/matches').then((r) => r.json()),
+      fetch('/api/standings').then((r) => r.json()),
+    ])
+      .then(([m, s]) => { setMatches(m); setStandings(s); })
       .catch(console.error)
       .finally(() => setLoading(false));
   }, []);
@@ -113,6 +125,40 @@ export default function Dashboard() {
           </span>
         </div>
       </div>
+
+      {/* League table */}
+      {standings.length > 0 && (
+        <div className="bg-white dark:bg-gray-800 rounded-lg p-5 shadow-sm dark:shadow-none">
+          <div className="mb-3">
+            <h2 className="text-sm text-gray-500 dark:text-gray-400 uppercase tracking-wide">Tabelle</h2>
+          </div>
+          <div className="space-y-0">
+            {standings.map((s) => {
+              const isWolf = s.team_id === WOLF_ID;
+              const showPromotionBorder = s.rank === 3;
+              const showRelegationBorder = s.rank === TOTAL_TEAMS - 1;
+              return (
+                <div
+                  key={s.team_id}
+                  className={`flex items-center gap-2 py-1.5 text-sm ${showPromotionBorder ? 'border-t border-t-green-300 dark:border-t-green-700' : showRelegationBorder ? 'border-t border-t-red-300 dark:border-t-red-800' : 'border-t border-gray-50 dark:border-gray-700/50'} ${isWolf ? 'font-semibold' : ''}`}
+                >
+                  <span className={`w-5 text-right text-xs shrink-0 font-medium ${standingRowClass(s.rank)}`}>
+                    {s.rank}
+                  </span>
+                  <span className={`flex-1 truncate ${isWolf ? 'text-blue-700 dark:text-blue-300' : 'text-gray-700 dark:text-gray-300'}`}>
+                    {s.team_name}
+                    {isWolf && <span className="ml-1 text-blue-400 text-xs">◀</span>}
+                  </span>
+                  <span className="text-xs text-gray-400 dark:text-gray-500 w-6 text-center shrink-0">{s.games}</span>
+                  <span className={`text-xs font-bold w-10 text-right shrink-0 ${standingRowClass(s.rank)}`}>
+                    {s.points_pos}:{s.points_neg}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Recent form */}
       {recentFive.length > 0 && (
@@ -204,7 +250,7 @@ export default function Dashboard() {
           <div className="font-semibold mb-1">Alle Spiele</div>
           <div className="text-xs text-gray-500 dark:text-gray-400">{matches.length} Einträge</div>
         </Link>
-        <Link to="/players" className="bg-white dark:bg-gray-800 rounded-lg p-4 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors shadow-sm dark:shadow-none">
+<Link to="/players" className="bg-white dark:bg-gray-800 rounded-lg p-4 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors shadow-sm dark:shadow-none">
           <div className="font-semibold mb-1">Spielerstatistik</div>
           <div className="text-xs text-gray-500 dark:text-gray-400">Saison-Übersicht</div>
         </Link>

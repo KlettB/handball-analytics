@@ -3,10 +3,11 @@
 ## Ziel
 Erweiterte Analysen und produktionsreifes Deployment.
 
-## Features (geplant)
-- Comeback-Index
-- Hin-/Rückrunden-Vergleich
-- Saison-Momentum (Formkurve)
-- Deployment (Docker, VPS, o.ä.)
+## Features
 
-## Status: TODO
+- [x] Comeback-Index — Team.jsx, Übersicht-Tab
+- [x] Hin-/Rückrunden-Vergleich — Team.jsx, Übersicht-Tab
+- [x] Deployment — Ubuntu VPS (Hetzner), Nginx Reverse Proxy, PM2, Domain handball-statistics.de
+- [ ] Saison-Formkurve — verschoben nach Phase 6
+
+## Status: DONE (Formkurve → Phase 6)
