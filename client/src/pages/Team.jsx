@@ -69,7 +69,7 @@ function PowerplayCard({ label, data, color, bg, border }) {
       <div className="space-y-1.5 text-xs">
         <div className="flex justify-between text-gray-400">
           <span className="text-gray-600 dark:text-gray-400">Situationen</span>
-          <span className="font-medium text-white">{data.total}</span>
+          <span className="font-medium text-gray-900 dark:text-white">{data.total}</span>
         </div>
         <div className="flex justify-between text-gray-400">
           <span className="text-gray-600 dark:text-gray-400">Tore erzielt</span>
@@ -270,8 +270,8 @@ export default function Team() {
             <div className="bg-gray-800 rounded-lg p-5 space-y-4">
               <h2 className="text-sm text-gray-500 dark:text-gray-400 uppercase tracking-wide">Über-/Unterzahl</h2>
               <div className="grid grid-cols-2 gap-4 text-sm">
-                <PowerplayCard label="Überzahl" data={powerplay.ueberzahl} color="text-green-400" border="border-green-800/40" bg="bg-green-900/20" />
-                <PowerplayCard label="Unterzahl" data={powerplay.unterzahl} color="text-red-400" border="border-red-800/40" bg="bg-red-900/20" />
+                <PowerplayCard label="Überzahl" data={powerplay.ueberzahl} color="text-green-600 dark:text-green-400" border="border-green-200 dark:border-green-800/40" bg="bg-green-50 dark:bg-green-900/20" />
+                <PowerplayCard label="Unterzahl" data={powerplay.unterzahl} color="text-red-600 dark:text-red-400" border="border-red-200 dark:border-red-800/40" bg="bg-red-50 dark:bg-red-900/20" />
               </div>
               <h2 className="text-sm text-gray-500 dark:text-gray-400 uppercase tracking-wide pt-2 border-t border-gray-100 dark:border-gray-700">Gleichzahl</h2>
               <p className="text-xs text-gray-400 dark:text-gray-500 -mt-2">Tore außerhalb von Über-/Unterzahl-Fenstern</p>
@@ -281,7 +281,7 @@ export default function Team() {
                 const ratio = total > 0 ? ((gz.goals / total) * 100).toFixed(0) : null;
                 const barW = total > 0 ? (gz.goals / total) * 100 : 50;
                 return (
-                  <div className="rounded-lg p-4 border bg-blue-900/20 border-blue-800/40 text-xs">
+                  <div className="rounded-lg p-4 border bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800/40 text-xs">
                     <div className="grid grid-cols-3 gap-3 mb-3 text-center">
                       <div>
                         <div className="text-lg font-bold text-green-400">{gz.goals}</div>

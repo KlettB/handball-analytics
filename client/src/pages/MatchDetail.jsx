@@ -388,7 +388,7 @@ function TabAnalyse({ events, match }) {
               return (
                 <div
                   key={i}
-                  className={`rounded p-3 text-sm ${isWolf ? 'bg-green-900/30 border border-green-800/50' : 'bg-red-900/30 border border-red-800/50'}`}
+                  className={`rounded p-3 text-sm ${isWolf ? 'bg-green-50 border border-green-200 dark:bg-green-900/30 dark:border-green-800/50' : 'bg-red-50 border border-red-200 dark:bg-red-900/30 dark:border-red-800/50'}`}
                 >
                   <div className="flex items-center justify-between mb-1">
                     <span className={`font-bold ${isWolf ? 'text-green-400' : 'text-red-400'}`}>
@@ -439,15 +439,15 @@ function TabAnalyse({ events, match }) {
             return (
               <div className="grid grid-cols-2 gap-3 mb-4 text-xs">
                 {[
-                  { label: 'Überzahl', s: summary(ueber), color: 'text-green-400', bg: 'bg-green-900/20', border: 'border-green-800/40' },
-                  { label: 'Unterzahl', s: summary(unter), color: 'text-red-400', bg: 'bg-red-900/20', border: 'border-red-800/40' },
+                  { label: 'Überzahl', s: summary(ueber), color: 'text-green-600 dark:text-green-400', bg: 'bg-green-50 dark:bg-green-900/20', border: 'border-green-200 dark:border-green-800/40' },
+                  { label: 'Unterzahl', s: summary(unter), color: 'text-red-600 dark:text-red-400', bg: 'bg-red-50 dark:bg-red-900/20', border: 'border-red-200 dark:border-red-800/40' },
                 ].map(({ label, s, color, bg, border }) => (
                   <div key={label} className={`rounded-lg p-3 border ${bg} ${border}`}>
                     <div className={`font-semibold mb-2 ${color}`}>{label}</div>
-                    <div className="space-y-1 text-gray-400">
+                    <div className="space-y-1 text-gray-500 dark:text-gray-400">
                       <div className="flex justify-between">
                         <span>Situationen</span>
-                        <span className="font-medium text-white">{s.total}</span>
+                        <span className="font-medium text-gray-900 dark:text-white">{s.total}</span>
                       </div>
                       <div className="flex justify-between">
                         <span>Tore erzielt</span>
@@ -485,15 +485,15 @@ function TabAnalyse({ events, match }) {
                   <span
                     className={`shrink-0 font-medium text-xs px-1.5 py-0.5 rounded ${
                       isUeber
-                        ? 'bg-green-900/40 text-green-400'
-                        : 'bg-red-900/40 text-red-400'
+                        ? 'bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-400'
+                        : 'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-400'
                     }`}
                   >
                     {isUeber ? 'Überzahl' : 'Unterzahl'}
                   </span>
                   <span className="flex-1 min-w-0 text-gray-500 dark:text-gray-400 text-xs">
                     {s.playerName && (
-                      <span className="text-gray-300">{s.playerName} · </span>
+                      <span className="text-gray-700 dark:text-gray-300">{s.playerName} · </span>
                     )}
                     {s.wolfGoals}:{s.oppGoals} Tore
                     {s.equalizer && (
