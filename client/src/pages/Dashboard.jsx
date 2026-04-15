@@ -56,7 +56,7 @@ const TOTAL_TEAMS = 14;
 
 function standingRowClass(rank) {
   if (rank <= 2) return 'text-green-600 dark:text-green-400';
-  if (rank >= TOTAL_TEAMS - 1) return 'text-red-600 dark:text-red-400';
+  if (rank >= TOTAL_TEAMS - 2) return 'text-red-600 dark:text-red-400';
   return 'text-gray-600 dark:text-gray-400';
 }
 
@@ -143,7 +143,7 @@ export default function Dashboard() {
             {standings.map((s) => {
               const isWolf = s.team_id === WOLF_ID;
               const showPromotionBorder = s.rank === 3;
-              const showRelegationBorder = s.rank === TOTAL_TEAMS - 1;
+              const showRelegationBorder = s.rank === TOTAL_TEAMS - 2;
               return (
                 <div
                   key={s.team_id}
