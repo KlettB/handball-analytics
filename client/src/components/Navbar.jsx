@@ -6,7 +6,6 @@ const links = [
   { to: '/matches', label: 'Spiele' },
   { to: '/players', label: 'Spieler' },
   { to: '/team', label: 'Team' },
-  { to: '/standings', label: 'Tabelle' },
 ];
 
 function SunIcon() {

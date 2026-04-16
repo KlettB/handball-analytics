@@ -42,9 +42,15 @@ export default function OpponentDetail() {
   const [formData, setFormData] = useState([]);
   const [goalsTrend, setGoalsTrend] = useState([]);
   const [players, setPlayers] = useState([]);
+  const [phases, setPhases] = useState([]);
+  const [phaseExtremes, setPhaseExtremes] = useState(null);
+  const [powerplay, setPowerplay] = useState(null);
   const [standing, setStanding] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('uebersicht');
+  const [filterLocation, setFilterLocation] = useState('all');
+  const [filterHalf, setFilterHalf] = useState('all');
+  const [filterLoading, setFilterLoading] = useState(false);
 
   useEffect(() => {
     const q = `?teamId=${encodeURIComponent(oppTeamId)}`;
@@ -53,13 +59,19 @@ export default function OpponentDetail() {
       fetch(`/api/stats/form${q}`).then((r) => r.json()),
       fetch(`/api/stats/goals-trend${q}`).then((r) => r.json()),
       fetch(`/api/stats/players${q}`).then((r) => r.json()),
+      fetch(`/api/stats/phases${q}`).then((r) => r.json()),
+      fetch(`/api/stats/phases/extremes${q}`).then((r) => r.json()),
+      fetch(`/api/stats/powerplay${q}`).then((r) => r.json()),
       fetch('/api/standings').then((r) => r.json()),
     ])
-      .then(([m, fd, gt, pl, st]) => {
+      .then(([m, fd, gt, pl, ph, pe, pp, st]) => {
         setMatches(m);
         setFormData(fd);
         setGoalsTrend(gt);
         setPlayers(pl);
+        setPhases(ph);
+        setPhaseExtremes(pe);
+        setPowerplay(pp);
         const teamStanding = st.find((s) => s.team_id === oppTeamId);
         setStanding(teamStanding || null);
         const sample = m.find((x) => x.home_team_id === oppTeamId);
@@ -72,6 +84,24 @@ export default function OpponentDetail() {
       .catch(console.error)
       .finally(() => setLoading(false));
   }, [oppTeamId]);
+
+  useEffect(() => {
+    if (activeTab !== 'phasen') return;
+    setFilterLoading(true);
+    const params = new URLSearchParams({ teamId: oppTeamId, location: filterLocation, half: filterHalf });
+    Promise.all([
+      fetch(`/api/stats/phases?${params}`).then((r) => r.json()),
+      fetch(`/api/stats/phases/extremes?${params}`).then((r) => r.json()),
+      fetch(`/api/stats/powerplay?${params}`).then((r) => r.json()),
+    ])
+      .then(([ph, pe, pp]) => {
+        setPhases(ph);
+        setPhaseExtremes(pe);
+        setPowerplay(pp);
+      })
+      .catch(console.error)
+      .finally(() => setFilterLoading(false));
+  }, [filterLocation, filterHalf, activeTab, oppTeamId]);
 
   if (loading) {
     return (
@@ -111,6 +141,7 @@ export default function OpponentDetail() {
       <div className="flex border-b border-gray-200 dark:border-gray-700">
         {[
           { id: 'uebersicht', label: 'Übersicht' },
+          { id: 'phasen', label: 'Phasenanalyse' },
           { id: 'spieler', label: 'Spieler' },
           { id: 'h2h', label: `Gegen ${ownTeamName || 'uns'}` },
         ].map((tab) => (
@@ -132,6 +163,15 @@ export default function OpponentDetail() {
         <OverviewTab
           total={total} home={home} away={away} avgGf={avgGf} avgGa={avgGa}
           formData={formData} goalsTrend={goalsTrend} oppName={oppName}
+        />
+      )}
+
+      {activeTab === 'phasen' && (
+        <PhasenTab
+          phases={phases} phaseExtremes={phaseExtremes} powerplay={powerplay}
+          oppName={oppName} filterLocation={filterLocation} filterHalf={filterHalf}
+          setFilterLocation={setFilterLocation} setFilterHalf={setFilterHalf}
+          filterLoading={filterLoading}
         />
       )}
 
@@ -367,6 +407,224 @@ function PlayersTab({ players }) {
       <p className="text-xs text-gray-400 dark:text-gray-600 py-2 text-center">
         Klick auf Spaltenüberschrift zum Sortieren
       </p>
+    </div>
+  );
+}
+
+function FilterToggle({ options, value, onChange }) {
+  return (
+    <div className="flex rounded-lg overflow-hidden border border-gray-100 dark:border-gray-700 text-xs">
+      {options.map((o) => (
+        <button
+          key={o.value}
+          onClick={() => onChange(o.value)}
+          className={`px-3 py-1.5 transition-colors ${
+            value === o.value
+              ? 'bg-gray-200 dark:bg-gray-600 text-gray-900 dark:text-white'
+              : 'bg-white dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+          }`}
+        >
+          {o.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function PowerplayCard({ label, data, color, bg, border }) {
+  if (!data) return null;
+  return (
+    <div className={`rounded-lg p-4 border ${bg} ${border}`}>
+      <div className={`font-semibold mb-3 ${color}`}>{label}</div>
+      <div className="space-y-1.5 text-xs">
+        <div className="flex justify-between">
+          <span className="text-gray-600 dark:text-gray-400">Situationen</span>
+          <span className="font-medium text-gray-900 dark:text-white">{data.total}</span>
+        </div>
+        <div className="flex justify-between">
+          <span className="text-gray-600 dark:text-gray-400">Tore erzielt</span>
+          <span className="font-medium text-green-400">{data.goals}</span>
+        </div>
+        <div className="flex justify-between">
+          <span className="text-gray-600 dark:text-gray-400">Tore kassiert</span>
+          <span className="font-medium text-red-400">{data.conceded}</span>
+        </div>
+        <div className="border-t border-gray-100 dark:border-gray-700 pt-1.5 flex justify-between gap-2 text-gray-500">
+          <span className="text-green-400">{data.won}x gewonnen</span>
+          <span>{data.neutral}x neutral</span>
+          <span className="text-red-400">{data.lost}x verloren</span>
+        </div>
+        {data.total > 0 && (
+          <div className="flex justify-between">
+            <span className="text-gray-600 dark:text-gray-400">Gewinnquote</span>
+            <span className={data.won / data.total >= 0.5 ? 'text-green-400' : 'text-red-400'}>
+              {((data.won / data.total) * 100).toFixed(0)}% ({data.won}/{data.total})
+            </span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function PhasenTab({ phases, phaseExtremes, powerplay, oppName, filterLocation, filterHalf, setFilterLocation, setFilterHalf, filterLoading }) {
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-wrap gap-3 items-center">
+        <FilterToggle
+          options={[
+            { value: 'all', label: 'Alle Spiele' },
+            { value: 'home', label: 'Heim' },
+            { value: 'away', label: 'Auswärts' },
+          ]}
+          value={filterLocation}
+          onChange={setFilterLocation}
+        />
+        <FilterToggle
+          options={[
+            { value: 'all', label: 'Beide HZ' },
+            { value: '1', label: '1. Halbzeit' },
+            { value: '2', label: '2. Halbzeit' },
+          ]}
+          value={filterHalf}
+          onChange={setFilterHalf}
+        />
+        {filterLoading && <span className="text-xs text-gray-500">Lädt...</span>}
+      </div>
+
+      {phaseExtremes && (phaseExtremes.powerPhase || phaseExtremes.deathPhase) && (
+        <div className="grid grid-cols-2 gap-4">
+          {phaseExtremes.powerPhase && (
+            <div className="rounded-lg p-4 border bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800/40">
+              <div className="text-xs font-semibold text-green-600 dark:text-green-400 mb-1">Stärkste Phase</div>
+              <div className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                {phaseExtremes.powerPhase.start}. – {phaseExtremes.powerPhase.end}. Minute
+              </div>
+              <div className="space-y-1 text-xs">
+                <div className="flex justify-between">
+                  <span className="text-gray-600 dark:text-gray-400">Eigene Tore</span>
+                  <span className="font-medium text-green-400">{phaseExtremes.powerPhase.teamGoals}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600 dark:text-gray-400">Gegentore</span>
+                  <span className="font-medium text-red-400">{phaseExtremes.powerPhase.oppGoals}</span>
+                </div>
+                <div className="flex justify-between border-t border-green-200 dark:border-green-800/40 pt-1">
+                  <span className="text-gray-600 dark:text-gray-400">Netto</span>
+                  <span className="font-bold text-green-400">+{phaseExtremes.powerPhase.net}</span>
+                </div>
+              </div>
+            </div>
+          )}
+          {phaseExtremes.deathPhase && (
+            <div className="rounded-lg p-4 border bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800/40">
+              <div className="text-xs font-semibold text-red-600 dark:text-red-400 mb-1">Schwächste Phase</div>
+              <div className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                {phaseExtremes.deathPhase.start}. – {phaseExtremes.deathPhase.end}. Minute
+              </div>
+              <div className="space-y-1 text-xs">
+                <div className="flex justify-between">
+                  <span className="text-gray-600 dark:text-gray-400">Eigene Tore</span>
+                  <span className="font-medium text-green-400">{phaseExtremes.deathPhase.teamGoals}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600 dark:text-gray-400">Gegentore</span>
+                  <span className="font-medium text-red-400">{phaseExtremes.deathPhase.oppGoals}</span>
+                </div>
+                <div className="flex justify-between border-t border-red-200 dark:border-red-800/40 pt-1">
+                  <span className="text-gray-600 dark:text-gray-400">Netto</span>
+                  <span className="font-bold text-red-400">{phaseExtremes.deathPhase.net}</span>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {phases.length > 0 && (
+        <div className="bg-white dark:bg-gray-800 rounded-lg p-5 shadow-sm dark:shadow-none">
+          <h2 className="text-sm text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">Schwächephasen</h2>
+          <p className="text-xs text-gray-400 dark:text-gray-500 mb-4">Tore pro 5-Minuten-Block</p>
+          <div className="space-y-1.5">
+            {phases.map((p) => {
+              const maxVal = Math.max(...phases.map((x) => Math.max(x.teamGoals, x.oppGoals)), 1);
+              const teamW = Math.round((p.teamGoals / maxVal) * 100);
+              const oppW = Math.round((p.oppGoals / maxVal) * 100);
+              const netColor = p.net > 0 ? 'text-green-400' : p.net < 0 ? 'text-red-400' : 'text-gray-500';
+              return (
+                <div key={p.block} className="flex items-center gap-2 text-xs">
+                  <span className="w-14 text-right text-gray-400 dark:text-gray-500 shrink-0">{p.label}</span>
+                  <div className="flex-1 flex flex-col gap-0.5">
+                    <div className="flex items-center gap-1">
+                      <div className="h-3 bg-green-600 rounded-sm" style={{ width: `${teamW}%`, minWidth: teamW > 0 ? 4 : 0 }} />
+                      <span className="text-gray-400">{p.teamGoals}</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <div className="h-3 bg-red-700 rounded-sm" style={{ width: `${oppW}%`, minWidth: oppW > 0 ? 4 : 0 }} />
+                      <span className="text-gray-500">{p.oppGoals}</span>
+                    </div>
+                  </div>
+                  <span className={`w-8 text-right font-bold shrink-0 ${netColor}`}>
+                    {p.net > 0 ? `+${p.net}` : p.net}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+          <div className="flex gap-4 mt-3 text-xs text-gray-400 dark:text-gray-500">
+            <span className="flex items-center gap-1"><span className="w-3 h-2 bg-green-600 rounded-sm inline-block" /> {oppName}</span>
+            <span className="flex items-center gap-1"><span className="w-3 h-2 bg-red-700 rounded-sm inline-block" /> Gegner</span>
+          </div>
+        </div>
+      )}
+
+      {powerplay && (
+        <div className="bg-white dark:bg-gray-800 rounded-lg p-5 space-y-4 shadow-sm dark:shadow-none">
+          <h2 className="text-sm text-gray-500 dark:text-gray-400 uppercase tracking-wide">Über-/Unterzahl</h2>
+          <div className="grid grid-cols-2 gap-4 text-sm">
+            <PowerplayCard label="Überzahl" data={powerplay.ueberzahl} color="text-green-600 dark:text-green-400" border="border-green-200 dark:border-green-800/40" bg="bg-green-50 dark:bg-green-900/20" />
+            <PowerplayCard label="Unterzahl" data={powerplay.unterzahl} color="text-red-600 dark:text-red-400" border="border-red-200 dark:border-red-800/40" bg="bg-red-50 dark:bg-red-900/20" />
+          </div>
+          <h2 className="text-sm text-gray-500 dark:text-gray-400 uppercase tracking-wide pt-2 border-t border-gray-100 dark:border-gray-700">Gleichzahl</h2>
+          <p className="text-xs text-gray-400 dark:text-gray-500 -mt-2">Tore außerhalb von Über-/Unterzahl-Fenstern</p>
+          {(() => {
+            const gz = powerplay.gleichzahl;
+            const total = gz.goals + gz.conceded;
+            const ratio = total > 0 ? ((gz.goals / total) * 100).toFixed(0) : null;
+            const barW = total > 0 ? (gz.goals / total) * 100 : 50;
+            return (
+              <div className="rounded-lg p-4 border bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800/40 text-xs">
+                <div className="grid grid-cols-3 gap-3 mb-3 text-center">
+                  <div>
+                    <div className="text-lg font-bold text-green-400">{gz.goals}</div>
+                    <div className="text-gray-500">Tore erzielt</div>
+                  </div>
+                  <div>
+                    <div className="text-lg font-bold text-gray-900 dark:text-white">{total}</div>
+                    <div className="text-gray-500">Gesamt</div>
+                  </div>
+                  <div>
+                    <div className="text-lg font-bold text-red-400">{gz.conceded}</div>
+                    <div className="text-gray-500">Tore kassiert</div>
+                  </div>
+                </div>
+                {ratio && (
+                  <>
+                    <div className="flex rounded-full overflow-hidden h-2 mb-1.5">
+                      <div className="bg-green-500" style={{ width: `${barW}%` }} />
+                      <div className="bg-red-700 flex-1" />
+                    </div>
+                    <div className="flex justify-between text-gray-500">
+                      <span className="text-green-400 font-medium">{ratio}% Eigen</span>
+                      <span className="text-red-400 font-medium">{100 - Number(ratio)}% Gegner</span>
+                    </div>
+                  </>
+                )}
+              </div>
+            );
+          })()}
+        </div>
+      )}
     </div>
   );
 }

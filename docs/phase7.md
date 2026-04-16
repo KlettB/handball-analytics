@@ -83,22 +83,27 @@ Neue Seite `OpponentDetail.jsx` unter `/teams/:teamId`.
 
 ---
 
-## 7.4 Gegner-Vorschau (`/matches/:id/preview`) für bevorstehende Spiele
+## 7.4 Gegner-Vorschau für bevorstehende Spiele ✅
 
-Dedizierte Scouting-View für Spiele die noch bevorstehen (`state = 'Pre'`).
+Scouting-View direkt in `/matches/:id` für Spiele mit `state !== 'Post'`.
+
+### Implementierung
+- `MatchPreview`-Komponente in `MatchDetail.jsx` — wird statt der Tabs angezeigt wenn `state !== 'Post'`
+- Match-Header zeigt "– : –" statt Ergebnis, keine Halbzeit-/Zuschauer-Zeile
+- Pre-Spiele sind klickbar in MatchList und Dashboard (Nächste Spiele)
 
 ### Inhalt
-- **Kopfzeile**: Datum, Uhrzeit, Heim/Auswärts, aktueller Tabellenplatz des Gegners
-- **Gegner-Saison-Bilanz**: Siege/Unentschieden/Niederlagen, Tordurchschnitt, Heimstärke vs. Auswärts
-- **Formkurve des Gegners**: Letzte 5 Spiele (S/U/N-Badges)
-- **Stärken**: In welcher Phase trifft der Gegner am häufigsten? (Power-Phase des Gegners)
-- **Schwächen**: In welcher Phase kassiert der Gegner? (Death-Phase des Gegners)
-- **Schlüsselspieler**: Top-3 Torschützen, meiste 2-Minuten-Strafen
-- **Head-to-Head** (falls bereits gespielt): Ergebnis des Hinspiels
+- **Gegner-Profil**: Name, Tabellenplatz, Punkte, Saison-Bilanz (S/U/N), Tordurchschnitt
+- **Formkurve**: Letzte 5 Spiele als S/U/N-Badges
+- **Stärkste/Schwächste Phase**: Rolling 5-Min-Window Power/Death Phase des Gegners
+- **Über-/Unterzahl**: Saisonweite Powerplay-/Shorthanded-Zusammenfassung
+- **Top-Torschützen**: Die 5 besten Scorer des Gegners mit Spielanzahl
+- **Direkter Vergleich**: H2H-Ergebnisse (falls bereits gespielt), klickbar
+- **Link**: "Vollständige Gegner-Analyse →" verlinkt auf `/teams/:oppTeamId`
 
 ### Navigation
-- Spielliste: "Pre"-Spiele bekommen einen "Vorschau"-Button zusätzlich zum normalen Klick
-- Von der Spielliste direkt erreichbar
+- MatchList: Alle Spiele (nicht nur Post) als Link umgestellt
+- Dashboard Nächste Spiele: `<div>` → `<Link>` mit hover-Effekt
 
 ---
 
@@ -110,4 +115,4 @@ Dedizierte Scouting-View für Spiele die noch bevorstehen (`state = 'Pre'`).
 - 14 Teams, ~183 Spiele total (inkl. eigene Spiele), 13.165 Events
 - SQLite verkraftet das problemlos
 
-## Status: 7.1–7.3 DONE — 7.4 TODO
+## Status: 7.1–7.4 DONE

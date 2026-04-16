@@ -42,7 +42,7 @@ Die Datenbank ist die Source of Truth. Daten-Fetch ersetzt Daten nur bei erfolgr
 | 4 | Advanced Analytics + Deploy | DONE | [docs/phase4.md](docs/phase4.md) |
 | 5 | Ligatabelle + Spielkontext | DONE | [docs/phase5.md](docs/phase5.md) |
 | 6 | Power-/Death-Phasen + Formkurve | DONE | [docs/phase6.md](docs/phase6.md) |
-| 7 | Liga-wide Data + Gegner-Insights | TODO | [docs/phase7.md](docs/phase7.md) |
+| 7 | Liga-wide Data + Gegner-Insights | DONE | [docs/phase7.md](docs/phase7.md) |
 
 **Phasen strikt der Reihe nach abarbeiten. Jede Phase muss funktionieren bevor die nächste beginnt.**
 

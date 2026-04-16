@@ -741,6 +741,270 @@ function TabSpieler({ events, match, teamId }) {
   );
 }
 
+// --- Match Preview for upcoming games ---
+
+function MatchPreview({ match, teamId }) {
+  const oppTeamId = match.home_team_id === teamId ? match.away_team_id : match.home_team_id;
+  const oppName = match.home_team_id === teamId ? match.away_team_name : match.home_team_name;
+  const isHome = match.home_team_id === teamId;
+
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const q = `?teamId=${encodeURIComponent(oppTeamId)}`;
+    Promise.all([
+      fetch(`/api/matches${q}`).then((r) => r.json()),
+      fetch(`/api/stats/form${q}`).then((r) => r.json()),
+      fetch(`/api/stats/players${q}`).then((r) => r.json()),
+      fetch(`/api/stats/phases/extremes${q}`).then((r) => r.json()),
+      fetch(`/api/stats/powerplay${q}`).then((r) => r.json()),
+      fetch('/api/standings').then((r) => r.json()),
+    ])
+      .then(([matches, form, players, extremes, powerplay, standings]) => {
+        const finished = matches.filter((m) => m.state === 'Post' && m.home_goals != null);
+        let wins = 0, draws = 0, losses = 0, gf = 0, ga = 0;
+        for (const m of finished) {
+          const isH = m.home_team_id === oppTeamId;
+          const own = isH ? m.home_goals : m.away_goals;
+          const opp = isH ? m.away_goals : m.home_goals;
+          gf += own; ga += opp;
+          if (own > opp) wins++;
+          else if (own === opp) draws++;
+          else losses++;
+        }
+
+        const h2h = finished.filter((m) =>
+          (m.home_team_id === oppTeamId && m.away_team_id === teamId) ||
+          (m.away_team_id === oppTeamId && m.home_team_id === teamId)
+        );
+
+        const standing = standings.find((s) => s.team_id === oppTeamId);
+
+        setData({
+          played: finished.length, wins, draws, losses, gf, ga,
+          form: form.slice(-5),
+          topScorers: players.slice(0, 5),
+          extremes,
+          powerplay,
+          h2h,
+          standing,
+        });
+      })
+      .catch(console.error)
+      .finally(() => setLoading(false));
+  }, [oppTeamId, teamId]);
+
+  if (loading) {
+    return <div className="text-center py-8 text-gray-400">Gegner-Daten laden...</div>;
+  }
+
+  if (!data) {
+    return <div className="text-center py-8 text-gray-500">Keine Daten verfügbar.</div>;
+  }
+
+  const avgGf = data.played ? (data.gf / data.played).toFixed(1) : '–';
+  const avgGa = data.played ? (data.ga / data.played).toFixed(1) : '–';
+  const diff = data.gf - data.ga;
+
+  const resultLabel = (r) => r.result === 'win' ? 'S' : r.result === 'draw' ? 'U' : 'N';
+  const resultBadge = (r) => r.result === 'win'
+    ? 'bg-green-500 text-white'
+    : r.result === 'draw'
+    ? 'bg-yellow-500 text-white'
+    : 'bg-red-500 text-white';
+
+  return (
+    <div className="space-y-4">
+      <h2 className="text-sm text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+        Gegner-Vorschau: {oppName}
+      </h2>
+
+      {/* Standing + Record */}
+      <div className="bg-white dark:bg-gray-800 rounded-lg p-5 shadow-sm dark:shadow-none">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <Link to={`/teams/${oppTeamId}`} className="font-bold text-lg hover:text-blue-500 dark:hover:text-blue-400">
+              {oppName}
+            </Link>
+            {data.standing && (
+              <p className="text-sm text-gray-400 mt-0.5">Platz {data.standing.rank} · {data.standing.points_pos}:{data.standing.points_neg} Pkt</p>
+            )}
+          </div>
+          {data.form.length > 0 && (
+            <div className="flex gap-1">
+              {data.form.map((d) => (
+                <span key={d.matchId} className={`w-6 h-6 rounded text-xs font-bold flex items-center justify-center ${resultBadge(d)}`}>
+                  {resultLabel(d)}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+        <div className="grid grid-cols-4 gap-3 text-center text-sm">
+          <div>
+            <div className="text-2xl font-bold">{data.played}</div>
+            <div className="text-xs text-gray-500 mt-0.5">Spiele</div>
+          </div>
+          <div>
+            <div className="text-2xl font-bold text-green-500">{data.wins}</div>
+            <div className="text-xs text-gray-500 mt-0.5">Siege</div>
+          </div>
+          <div>
+            <div className="text-2xl font-bold text-yellow-500">{data.draws}</div>
+            <div className="text-xs text-gray-500 mt-0.5">Remis</div>
+          </div>
+          <div>
+            <div className="text-2xl font-bold text-red-500">{data.losses}</div>
+            <div className="text-xs text-gray-500 mt-0.5">Niederlagen</div>
+          </div>
+        </div>
+        <div className="flex justify-center gap-6 text-sm text-gray-500 dark:text-gray-400 border-t border-gray-100 dark:border-gray-700 pt-3 mt-4">
+          <span>{avgGf} Tore/Spiel</span>
+          <span className="text-gray-300 dark:text-gray-600">·</span>
+          <span>{avgGa} Gegentore/Spiel</span>
+          <span className="text-gray-300 dark:text-gray-600">·</span>
+          <span className={diff >= 0 ? 'text-green-500' : 'text-red-500'}>
+            {diff >= 0 ? '+' : ''}{diff}
+          </span>
+        </div>
+      </div>
+
+      {/* Power / Death Phase */}
+      {data.extremes && (data.extremes.powerPhase || data.extremes.deathPhase) && (
+        <div className="grid grid-cols-2 gap-3">
+          {data.extremes.powerPhase && (
+            <div className="rounded-lg p-3 border bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800/40">
+              <div className="text-xs font-semibold text-green-600 dark:text-green-400 mb-2">Stärkste Phase</div>
+              <div className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                {data.extremes.powerPhase.start}. – {data.extremes.powerPhase.end}. Minute
+              </div>
+              <div className="space-y-1 text-xs">
+                <div className="flex justify-between">
+                  <span className="text-gray-600 dark:text-gray-400">Eigene Tore</span>
+                  <span className="font-medium text-green-400">{data.extremes.powerPhase.teamGoals}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600 dark:text-gray-400">Gegentore</span>
+                  <span className="font-medium text-red-400">{data.extremes.powerPhase.oppGoals}</span>
+                </div>
+                <div className="flex justify-between border-t border-green-200 dark:border-green-800/40 pt-1">
+                  <span className="text-gray-600 dark:text-gray-400">Netto</span>
+                  <span className="font-bold text-green-400">+{data.extremes.powerPhase.net}</span>
+                </div>
+              </div>
+            </div>
+          )}
+          {data.extremes.deathPhase && (
+            <div className="rounded-lg p-3 border bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800/40">
+              <div className="text-xs font-semibold text-red-600 dark:text-red-400 mb-2">Schwächste Phase</div>
+              <div className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                {data.extremes.deathPhase.start}. – {data.extremes.deathPhase.end}. Minute
+              </div>
+              <div className="space-y-1 text-xs">
+                <div className="flex justify-between">
+                  <span className="text-gray-600 dark:text-gray-400">Eigene Tore</span>
+                  <span className="font-medium text-green-400">{data.extremes.deathPhase.teamGoals}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600 dark:text-gray-400">Gegentore</span>
+                  <span className="font-medium text-red-400">{data.extremes.deathPhase.oppGoals}</span>
+                </div>
+                <div className="flex justify-between border-t border-red-200 dark:border-red-800/40 pt-1">
+                  <span className="text-gray-600 dark:text-gray-400">Netto</span>
+                  <span className="font-bold text-red-400">{data.extremes.deathPhase.net}</span>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Powerplay summary */}
+      {data.powerplay && (data.powerplay.ueberzahl.total > 0 || data.powerplay.unterzahl.total > 0) && (
+        <div className="bg-white dark:bg-gray-800 rounded-lg p-5 shadow-sm dark:shadow-none">
+          <h3 className="text-sm text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3">Über-/Unterzahl</h3>
+          <div className="grid grid-cols-2 gap-3 text-xs">
+            {[
+              { label: 'In Überzahl', s: data.powerplay.ueberzahl, color: 'text-green-600 dark:text-green-400' },
+              { label: 'In Unterzahl', s: data.powerplay.unterzahl, color: 'text-red-600 dark:text-red-400' },
+            ].map(({ label, s, color }) => (
+              <div key={label} className="space-y-1">
+                <div className={`font-semibold mb-1 ${color}`}>{label} ({s.total}x)</div>
+                <div className="flex justify-between text-gray-500 dark:text-gray-400">
+                  <span>Tore erzielt</span>
+                  <span className="font-medium text-green-400">{s.goals}</span>
+                </div>
+                <div className="flex justify-between text-gray-500 dark:text-gray-400">
+                  <span>Tore kassiert</span>
+                  <span className="font-medium text-red-400">{s.conceded}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Top scorers */}
+      {data.topScorers.length > 0 && (
+        <div className="bg-white dark:bg-gray-800 rounded-lg p-5 shadow-sm dark:shadow-none">
+          <h3 className="text-sm text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3">Top-Torschützen</h3>
+          <div className="space-y-2">
+            {data.topScorers.map((p, i) => (
+              <div key={p.player_name} className="flex items-center gap-3 text-sm">
+                <span className="text-xs text-gray-400 w-4 text-right">{i + 1}.</span>
+                <span className="flex-1 truncate">{p.player_name}</span>
+                <span className="font-bold text-green-400">{p.goals}</span>
+                <span className="text-xs text-gray-500 w-14 text-right">({p.games_played} Sp.)</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* H2H */}
+      {data.h2h.length > 0 && (
+        <div className="bg-white dark:bg-gray-800 rounded-lg p-5 shadow-sm dark:shadow-none">
+          <h3 className="text-sm text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3">Direkter Vergleich</h3>
+          <div className="space-y-2">
+            {data.h2h.map((m) => {
+              const ownGoals = m.home_team_id === teamId ? m.home_goals : m.away_goals;
+              const oppG = m.home_team_id === teamId ? m.away_goals : m.home_goals;
+              const won = ownGoals > oppG;
+              const drew = ownGoals === oppG;
+              return (
+                <Link key={m.id} to={`/matches/${m.id}`} className="flex items-center gap-3 hover:opacity-80 text-sm">
+                  <span className={`w-6 h-6 rounded text-xs font-bold flex items-center justify-center text-white shrink-0 ${
+                    won ? 'bg-green-500' : drew ? 'bg-yellow-500' : 'bg-red-500'
+                  }`}>
+                    {won ? 'S' : drew ? 'U' : 'N'}
+                  </span>
+                  <span className="text-xs text-gray-400 w-20 shrink-0">
+                    {new Date(m.starts_at).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: '2-digit' })}
+                  </span>
+                  <span className="flex-1 truncate text-gray-500">
+                    {m.home_team_id === teamId ? 'H' : 'A'}
+                  </span>
+                  <span className="font-bold whitespace-nowrap">{ownGoals} : {oppG}</span>
+                </Link>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      <div className="text-center">
+        <Link
+          to={`/teams/${oppTeamId}`}
+          className="text-sm text-blue-500 dark:text-blue-400 hover:text-blue-600 dark:hover:text-blue-300"
+        >
+          Vollständige Gegner-Analyse &rarr;
+        </Link>
+      </div>
+    </div>
+  );
+}
+
 // --- Main component ---
 
 const TABS = [
@@ -783,6 +1047,7 @@ export default function MatchDetail() {
     );
   }
 
+  const isPreGame = match.state !== 'Post';
   const events = match.events || [];
 
   return (
@@ -791,7 +1056,7 @@ export default function MatchDetail() {
         &larr; Alle Spiele
       </Link>
 
-      {/* Score header */}
+      {/* Match header */}
       <div className="bg-white dark:bg-gray-800 rounded-lg p-6 mb-4 shadow-sm dark:shadow-none">
         <div className="text-xs text-gray-400 dark:text-gray-500 text-center mb-3">
           {formatDate(match.starts_at)} · {formatTime(match.starts_at)}
@@ -802,19 +1067,25 @@ export default function MatchDetail() {
           <div className="text-right flex-1">
             <div className="font-bold text-lg">{match.home_team_name}</div>
           </div>
-          <div className="text-3xl font-bold px-4">
-            {match.home_goals} : {match.away_goals}
-          </div>
+          {isPreGame ? (
+            <div className="text-xl font-bold px-4 text-gray-400 dark:text-gray-500">
+              – : –
+            </div>
+          ) : (
+            <div className="text-3xl font-bold px-4">
+              {match.home_goals} : {match.away_goals}
+            </div>
+          )}
           <div className="text-left flex-1">
             <div className="font-bold text-lg">{match.away_team_name}</div>
           </div>
         </div>
-        {match.home_goals_half != null && (
+        {!isPreGame && match.home_goals_half != null && (
           <div className="text-center text-sm text-gray-500 mt-1">
             Halbzeit: {match.home_goals_half} : {match.away_goals_half}
           </div>
         )}
-        {match.attendance && (
+        {!isPreGame && match.attendance && (
           <div className="text-center text-xs text-gray-600 mt-2">
             {match.attendance} Zuschauer
             {match.referee_info && ` · SR: ${match.referee_info}`}
@@ -822,33 +1093,39 @@ export default function MatchDetail() {
         )}
       </div>
 
-      {/* Tabs */}
-      <div className="flex border-b border-gray-100 dark:border-gray-700 mb-4">
-        {TABS.map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px ${
-              activeTab === tab.id
-                ? 'border-gray-900 dark:border-white text-gray-900 dark:text-white'
-                : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
-            }`}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
+      {isPreGame ? (
+        <MatchPreview match={match} teamId={teamId} />
+      ) : (
+        <>
+          {/* Tabs */}
+          <div className="flex border-b border-gray-100 dark:border-gray-700 mb-4">
+            {TABS.map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px ${
+                  activeTab === tab.id
+                    ? 'border-gray-900 dark:border-white text-gray-900 dark:text-white'
+                    : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
 
-      {/* Tab content */}
-      {activeTab === 'verlauf' && (
-        <TabSpieldverlauf
-          events={events}
-          homeTeamName={match.home_team_name}
-          awayTeamName={match.away_team_name}
-        />
+          {/* Tab content */}
+          {activeTab === 'verlauf' && (
+            <TabSpieldverlauf
+              events={events}
+              homeTeamName={match.home_team_name}
+              awayTeamName={match.away_team_name}
+            />
+          )}
+          {activeTab === 'analyse' && <TabAnalyse events={events} match={match} teamId={teamId} teamName={teamName} />}
+          {activeTab === 'spieler' && <TabSpieler events={events} match={match} teamId={teamId} />}
+        </>
       )}
-      {activeTab === 'analyse' && <TabAnalyse events={events} match={match} teamId={teamId} teamName={teamName} />}
-      {activeTab === 'spieler' && <TabSpieler events={events} match={match} teamId={teamId} />}
     </div>
   );
 }

@@ -139,8 +139,5 @@ function MatchCard({ match, standings, teamId }) {
     </div>
   );
 
-  if (isFinished) {
-    return <Link to={`/matches/${match.id}`} className="block">{inner}</Link>;
-  }
-  return inner;
+  return <Link to={`/matches/${match.id}`} className="block">{inner}</Link>;
 }

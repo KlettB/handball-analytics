@@ -4,12 +4,12 @@ import { useTeam } from '../TeamContext';
 
 const TOTAL_TEAMS = 14;
 // Bottom 2 are relegated, top 2 promoted (adjust if known)
-const RELEGATION_ZONE = TOTAL_TEAMS - 1; // rank >= this = danger
+const RELEGATION_ZONE = TOTAL_TEAMS - 2; // rank >= this = danger
 
 function rankBadgeClass(rank) {
   if (rank === 1) return 'bg-yellow-100 dark:bg-yellow-900/40 text-yellow-700 dark:text-yellow-400';
   if (rank <= 2) return 'bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-400';
-  if (rank >= TOTAL_TEAMS - 1) return 'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-400';
+  if (rank >= TOTAL_TEAMS - 2) return 'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-400';
   return 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300';
 }
 
@@ -75,11 +75,11 @@ export default function Standings() {
             {standings.map((s, idx) => {
               const isMyTeam = s.team_id === teamId;
               const isPromotionZone = s.rank <= 2;
-              const isRelegationZone = s.rank >= TOTAL_TEAMS - 1;
+              const isRelegationZone = s.rank >= TOTAL_TEAMS - 2;
 
               // Zone separator: draw a line above rank 3 and above rank 13
               const showPromotionBorder = idx > 0 && standings[idx - 1].rank <= 2 && s.rank > 2;
-              const showRelegationBorder = !showPromotionBorder && idx > 0 && standings[idx - 1].rank < TOTAL_TEAMS - 1 && isRelegationZone;
+              const showRelegationBorder = !showPromotionBorder && idx > 0 && standings[idx - 1].rank < TOTAL_TEAMS - 2 && isRelegationZone;
 
               return (
                 <tr
