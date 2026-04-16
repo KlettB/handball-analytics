@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useTeam } from '../TeamContext';
 import {
   ComposedChart, Bar, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, ReferenceLine,
 } from 'recharts';
@@ -13,12 +14,13 @@ function StatBox({ label, value, color = 'text-gray-900 dark:text-white' }) {
   );
 }
 
-function computeSplit(matches, filter) {
+function computeSplit(matches, filter, teamId) {
   const games = matches.filter(filter);
   let wins = 0, draws = 0, losses = 0, gf = 0, ga = 0;
   for (const m of games) {
-    const own = m.is_home_game ? m.home_goals : m.away_goals;
-    const opp = m.is_home_game ? m.away_goals : m.home_goals;
+    const isH = m.home_team_id === teamId;
+    const own = isH ? m.home_goals : m.away_goals;
+    const opp = isH ? m.away_goals : m.home_goals;
     gf += own; ga += opp;
     if (own > opp) wins++;
     else if (own === opp) draws++;
@@ -27,14 +29,16 @@ function computeSplit(matches, filter) {
   return { played: games.length, wins, draws, losses, gf, ga, diff: gf - ga };
 }
 
-function buildOpponentStats(finished) {
+function buildOpponentStats(finished, teamId) {
   const map = {};
   for (const m of finished) {
-    const name = m.is_home_game ? m.away_team_name : m.home_team_name;
-    const own = m.is_home_game ? m.home_goals : m.away_goals;
-    const opp = m.is_home_game ? m.away_goals : m.home_goals;
-    if (!map[name]) map[name] = { name, games: [] };
-    map[name].games.push({ own, opp, id: m.id, isHome: !!m.is_home_game });
+    const isH = m.home_team_id === teamId;
+    const name = isH ? m.away_team_name : m.home_team_name;
+    const oppId = isH ? m.away_team_id : m.home_team_id;
+    const own = isH ? m.home_goals : m.away_goals;
+    const opp = isH ? m.away_goals : m.home_goals;
+    if (!map[name]) map[name] = { name, oppId, games: [] };
+    map[name].games.push({ own, opp, id: m.id, isHome: isH });
   }
   return Object.values(map)
     .map((o) => {
@@ -101,6 +105,7 @@ function PowerplayCard({ label, data, color, bg, border }) {
 }
 
 export default function Team() {
+  const { teamId, teamName } = useTeam();
   const [matches, setMatches] = useState([]);
   const [phases, setPhases] = useState([]);
   const [phaseExtremes, setPhaseExtremes] = useState(null);
@@ -177,21 +182,24 @@ export default function Team() {
   }
 
   const finished = matches.filter((m) => m.state === 'Post' && m.home_goals != null);
-  const home = computeSplit(finished, (m) => m.is_home_game === 1);
-  const away = computeSplit(finished, (m) => m.is_home_game === 0);
-  const total = computeSplit(finished, () => true);
-  const hinrunde = computeSplit(finished, (m) => new Date(m.starts_at) < new Date('2026-01-01'));
-  const rueckrunde = computeSplit(finished, (m) => new Date(m.starts_at) >= new Date('2026-01-01'));
+  const home = computeSplit(finished, (m) => m.home_team_id === teamId, teamId);
+  const away = computeSplit(finished, (m) => m.away_team_id === teamId, teamId);
+  const total = computeSplit(finished, () => true, teamId);
+  const hinrunde = computeSplit(finished, (m) => new Date(m.starts_at) < new Date('2026-01-01'), teamId);
+  const rueckrunde = computeSplit(finished, (m) => new Date(m.starts_at) >= new Date('2026-01-01'), teamId);
 
   const avgGf = total.played ? (total.gf / total.played).toFixed(1) : '–';
   const avgGa = total.played ? (total.ga / total.played).toFixed(1) : '–';
 
-  const results = finished.map((m) => ({
-    ...m,
-    own: m.is_home_game ? m.home_goals : m.away_goals,
-    opp: m.is_home_game ? m.away_goals : m.home_goals,
-    opponent: m.is_home_game ? m.away_team_name : m.home_team_name,
-  }));
+  const results = finished.map((m) => {
+    const isH = m.home_team_id === teamId;
+    return {
+      ...m,
+      own: isH ? m.home_goals : m.away_goals,
+      opp: isH ? m.away_goals : m.home_goals,
+      opponent: isH ? m.away_team_name : m.home_team_name,
+    };
+  });
 
   const wins = results
     .filter((r) => r.own > r.opp)
@@ -200,13 +208,13 @@ export default function Team() {
     .filter((r) => r.own < r.opp)
     .sort((a, b) => a.own - a.opp - (b.own - b.opp));
 
-  const opponents = buildOpponentStats(finished);
+  const opponents = buildOpponentStats(finished, teamId);
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-6 space-y-6">
       <div>
         <h1 className="text-xl font-bold">Teamanalyse</h1>
-        <p className="text-sm text-gray-400 mt-0.5">Saison 2025/26 · TSV Wolfschlugen</p>
+        <p className="text-sm text-gray-400 mt-0.5">Saison 2025/26 · {teamName}</p>
       </div>
 
       {/* Tabs */}
@@ -267,8 +275,8 @@ export default function Team() {
                   </div>
                   <div className="space-y-1 text-xs">
                     <div className="flex justify-between">
-                      <span className="text-gray-600 dark:text-gray-400">Wolfschl. Tore</span>
-                      <span className="font-medium text-green-400">{phaseExtremes.powerPhase.wolfGoals}</span>
+                      <span className="text-gray-600 dark:text-gray-400">Eigene Tore</span>
+                      <span className="font-medium text-green-400">{phaseExtremes.powerPhase.teamGoals}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-600 dark:text-gray-400">Gegentore</span>
@@ -291,8 +299,8 @@ export default function Team() {
                   </div>
                   <div className="space-y-1 text-xs">
                     <div className="flex justify-between">
-                      <span className="text-gray-600 dark:text-gray-400">Wolfschl. Tore</span>
-                      <span className="font-medium text-green-400">{phaseExtremes.deathPhase.wolfGoals}</span>
+                      <span className="text-gray-600 dark:text-gray-400">Eigene Tore</span>
+                      <span className="font-medium text-green-400">{phaseExtremes.deathPhase.teamGoals}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-600 dark:text-gray-400">Gegentore</span>
@@ -315,8 +323,8 @@ export default function Team() {
               <p className="text-xs text-gray-400 dark:text-gray-500 mb-4">Tore pro 5-Minuten-Block</p>
               <div className="space-y-1.5">
                 {phases.map((p) => {
-                  const maxVal = Math.max(...phases.map((x) => Math.max(x.wolfGoals, x.oppGoals)), 1);
-                  const wolfW = Math.round((p.wolfGoals / maxVal) * 100);
+                  const maxVal = Math.max(...phases.map((x) => Math.max(x.teamGoals, x.oppGoals)), 1);
+                  const teamW = Math.round((p.teamGoals / maxVal) * 100);
                   const oppW = Math.round((p.oppGoals / maxVal) * 100);
                   const netColor = p.net > 0 ? 'text-green-400' : p.net < 0 ? 'text-red-400' : 'text-gray-500';
                   return (
@@ -324,8 +332,8 @@ export default function Team() {
                       <span className="w-14 text-right text-gray-400 dark:text-gray-500 shrink-0">{p.label}</span>
                       <div className="flex-1 flex flex-col gap-0.5">
                         <div className="flex items-center gap-1">
-                          <div className="h-3 bg-green-600 rounded-sm" style={{ width: `${wolfW}%`, minWidth: wolfW > 0 ? 4 : 0 }} />
-                          <span className="text-gray-400">{p.wolfGoals}</span>
+                          <div className="h-3 bg-green-600 rounded-sm" style={{ width: `${teamW}%`, minWidth: teamW > 0 ? 4 : 0 }} />
+                          <span className="text-gray-400">{p.teamGoals}</span>
                         </div>
                         <div className="flex items-center gap-1">
                           <div className="h-3 bg-red-700 rounded-sm" style={{ width: `${oppW}%`, minWidth: oppW > 0 ? 4 : 0 }} />
@@ -340,7 +348,7 @@ export default function Team() {
                 })}
               </div>
               <div className="flex gap-4 mt-3 text-xs text-gray-400 dark:text-gray-500">
-                <span className="flex items-center gap-1"><span className="w-3 h-2 bg-green-600 rounded-sm inline-block" /> Wolfschlugen</span>
+                <span className="flex items-center gap-1"><span className="w-3 h-2 bg-green-600 rounded-sm inline-block" /> {teamName}</span>
                 <span className="flex items-center gap-1"><span className="w-3 h-2 bg-red-700 rounded-sm inline-block" /> Gegner</span>
               </div>
             </div>
@@ -384,7 +392,7 @@ export default function Team() {
                           <div className="bg-red-700 flex-1" />
                         </div>
                         <div className="flex justify-between text-gray-500">
-                          <span className="text-green-400 font-medium">{ratio}% Wolf</span>
+                          <span className="text-green-400 font-medium">{ratio}% Eigen</span>
                           <span className="text-red-400 font-medium">{100 - Number(ratio)}% Gegner</span>
                         </div>
                       </>
@@ -628,7 +636,7 @@ export default function Team() {
                 >
                   {o.net > 0 ? `+${o.net}` : o.net}
                 </span>
-                <span className="flex-1 truncate text-gray-700 dark:text-gray-300">{o.name}</span>
+                <Link to={`/teams/${o.oppId}`} className="flex-1 truncate text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400">{o.name}</Link>
                 <div className="flex gap-2 shrink-0">
                   {o.games.map((g, i) => (
                     <Link
@@ -698,7 +706,7 @@ export default function Team() {
       {comebacks.filter((c) => c.deficit > 2).length > 0 && (
         <div className="bg-white dark:bg-gray-800 rounded-lg p-5 shadow-sm dark:shadow-none">
           <h2 className="text-sm text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">Comeback-Spiele</h2>
-          <p className="text-xs text-gray-400 dark:text-gray-500 mb-4">Spiele wo Wolf mehr als 2 Tore zurücklag und nicht verlor</p>
+          <p className="text-xs text-gray-400 dark:text-gray-500 mb-4">Spiele mit mehr als 2 Toren Rückstand, die nicht verloren wurden</p>
           <div className="space-y-2">
             {comebacks.filter((c) => c.deficit > 2).map((c) => (
               <Link

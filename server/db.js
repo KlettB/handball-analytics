@@ -58,6 +58,12 @@ function initSchema() {
     CREATE INDEX IF NOT EXISTS idx_events_match ON match_events(match_id);
     CREATE INDEX IF NOT EXISTS idx_matches_starts ON matches(starts_at);
 
+    CREATE TABLE IF NOT EXISTS teams (
+      id    TEXT PRIMARY KEY,
+      name  TEXT NOT NULL,
+      league TEXT
+    );
+
     CREATE TABLE IF NOT EXISTS standings (
       team_id   TEXT PRIMARY KEY,
       team_name TEXT NOT NULL,

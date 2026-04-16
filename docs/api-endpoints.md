@@ -29,7 +29,7 @@ Alle Spiele, sortiert nach Datum absteigend.
     "referee_info": "Konstantin Geis, Jörg Hanselmann",
     "attendance": 400,
     "game_number": "900423",
-    "is_home_game": 1,
+    "is_home_game": 0,
     "fetched_at": "2026-04-14T17:20:00.000Z"
   }
 ]
@@ -98,6 +98,70 @@ Manueller Trigger für Daten-Fetch. Nur für Entwicklung/Debugging.
 **Response** `409` (bereits laufend):
 ```json
 { "error": "Fetch already in progress" }
+```
+
+---
+
+### `POST /api/fetch-data/league`
+
+Manueller Trigger für Liga-weiten Daten-Fetch. Fetcht Spielpläne + Ticker aller Liga-Teams (außer dem eigenen). Nur für Entwicklung/Debugging.
+
+**Body**: keiner nötig
+
+**Response** `200`:
+```json
+{
+  "teams": 13,
+  "newMatches": 34,
+  "tickersFetched": 30,
+  "errors": 0
+}
+```
+
+**Response** `409` (bereits laufend):
+```json
+{ "error": "League fetch already in progress" }
+```
+
+---
+
+### `GET /api/config`
+
+Gibt die Team-Konfiguration zurück (aus ENV-Variablen `TEAM_ID` und `TEAM_NAME`).
+
+**Response** `200`:
+```json
+{
+  "teamId": "handball4all.baden-wuerttemberg.1331231",
+  "teamName": "TSV Wolfschlugen"
+}
+```
+
+---
+
+### `GET /api/standings`
+
+Aktuelle Ligatabelle.
+
+**Response** `200`:
+```json
+[
+  {
+    "team_id": "handball4all.baden-wuerttemberg.1331231",
+    "team_name": "TSV Wolfschlugen",
+    "rank": 5,
+    "games": 20,
+    "wins": 12,
+    "draws": 1,
+    "losses": 7,
+    "goals_for": 580,
+    "goals_against": 560,
+    "goal_diff": 20,
+    "points_pos": 25,
+    "points_neg": 15,
+    "fetched_at": "2026-04-14T03:00:00.000Z"
+  }
+]
 ```
 
 ---

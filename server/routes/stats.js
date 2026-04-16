@@ -3,9 +3,26 @@ const { getDb } = require('../db');
 
 const router = express.Router();
 
-// GET /api/stats/players - season stats for Wolfschlugen players only
+function getTeamId(req) {
+  return req.query.teamId || process.env.TEAM_ID || '';
+}
+
+function teamSide(match, teamId) {
+  return match.home_team_id === teamId ? 'Home' : 'Away';
+}
+
+function oppSide(match, teamId) {
+  return match.home_team_id === teamId ? 'Away' : 'Home';
+}
+
+function isHomeForTeam(match, teamId) {
+  return match.home_team_id === teamId;
+}
+
+// GET /api/stats/players - season stats for the configured team's players
 router.get('/players', (req, res) => {
   const db = getDb();
+  const teamId = getTeamId(req);
   const rows = db.prepare(`
     SELECT
       me.player_name,
@@ -19,13 +36,14 @@ router.get('/players', (req, res) => {
     FROM match_events me
     JOIN matches m ON me.match_id = m.id
     WHERE me.player_name IS NOT NULL
+      AND (m.home_team_id = @teamId OR m.away_team_id = @teamId)
       AND (
-        (m.is_home_game = 1 AND me.team = 'Home') OR
-        (m.is_home_game = 0 AND me.team = 'Away')
+        (m.home_team_id = @teamId AND me.team = 'Home') OR
+        (m.away_team_id = @teamId AND me.team = 'Away')
       )
     GROUP BY me.player_name
     ORDER BY goals DESC, me.player_name ASC
-  `).all();
+  `).all({ teamId });
   res.json(rows);
 });
 
@@ -33,62 +51,66 @@ router.get('/players', (req, res) => {
 // Query params: location=home|away|all, half=1|2|all
 router.get('/phases', (req, res) => {
   const db = getDb();
+  const teamId = getTeamId(req);
   const { location = 'all', half = 'all' } = req.query;
 
   let locationFilter = '';
-  if (location === 'home') locationFilter = 'AND m.is_home_game = 1';
-  else if (location === 'away') locationFilter = 'AND m.is_home_game = 0';
+  if (location === 'home') locationFilter = 'AND m.home_team_id = @teamId';
+  else if (location === 'away') locationFilter = 'AND m.away_team_id = @teamId';
 
   let halfFilter = '';
   if (half === '1') halfFilter = 'AND me.elapsed_seconds < 1800';
   else if (half === '2') halfFilter = 'AND me.elapsed_seconds >= 1800';
 
   const events = db.prepare(`
-    SELECT me.team, me.elapsed_seconds, m.is_home_game
+    SELECT me.team, me.elapsed_seconds, m.home_team_id
     FROM match_events me
     JOIN matches m ON me.match_id = m.id
     WHERE me.type IN ('Goal', 'SevenMeterGoal')
       AND me.elapsed_seconds IS NOT NULL
       AND m.state = 'Post'
+      AND (m.home_team_id = @teamId OR m.away_team_id = @teamId)
       ${locationFilter}
       ${halfFilter}
-  `).all();
+  `).all({ teamId });
 
-  // 12 blocks of 5 minutes (0–60')
   const blocks = Array.from({ length: 12 }, (_, i) => ({
     block: i,
     label: `${i * 5}–${(i + 1) * 5}'`,
-    wolfGoals: 0,
+    teamGoals: 0,
     oppGoals: 0,
   }));
 
   for (const e of events) {
     const block = Math.min(Math.floor(e.elapsed_seconds / 300), 11);
-    const wolfTeam = e.is_home_game ? 'Home' : 'Away';
-    if (e.team === wolfTeam) {
-      blocks[block].wolfGoals++;
+    const myTeamSide = e.home_team_id === teamId ? 'Home' : 'Away';
+    if (e.team === myTeamSide) {
+      blocks[block].teamGoals++;
     } else {
       blocks[block].oppGoals++;
     }
   }
 
-  res.json(blocks.map((b) => ({ ...b, net: b.wolfGoals - b.oppGoals })));
+  res.json(blocks.map((b) => ({ ...b, net: b.teamGoals - b.oppGoals })));
 });
 
 // GET /api/stats/powerplay - season powerplay/shorthanded/gleichzahl summary
 // Query params: location=home|away|all, half=1|2|all
 router.get('/powerplay', (req, res) => {
   const db = getDb();
+  const teamId = getTeamId(req);
   const { location = 'all', half = 'all' } = req.query;
 
   let locationFilter = '';
-  if (location === 'home') locationFilter = 'AND is_home_game = 1';
-  else if (location === 'away') locationFilter = 'AND is_home_game = 0';
+  if (location === 'home') locationFilter = 'AND home_team_id = @teamId';
+  else if (location === 'away') locationFilter = 'AND away_team_id = @teamId';
 
   const matches = db.prepare(`
-    SELECT id, is_home_game FROM matches
-    WHERE state = 'Post' ${locationFilter}
-  `).all();
+    SELECT id, home_team_id FROM matches
+    WHERE state = 'Post'
+      AND (home_team_id = @teamId OR away_team_id = @teamId)
+      ${locationFilter}
+  `).all({ teamId });
 
   const emptyBucket = () => ({ total: 0, goals: 0, conceded: 0, won: 0, neutral: 0, lost: 0 });
   const summary = {
@@ -105,8 +127,8 @@ router.get('/powerplay', (req, res) => {
   `);
 
   for (const match of matches) {
-    const wolfTeam = match.is_home_game ? 'Home' : 'Away';
-    const oppTeam = match.is_home_game ? 'Away' : 'Home';
+    const myTeam = teamSide(match, teamId);
+    const opp = oppSide(match, teamId);
     let events = eventsStmt.all(match.id);
 
     // Apply half filter
@@ -126,14 +148,14 @@ router.get('/powerplay', (req, res) => {
     for (const pen of penalties) {
       const start = pen.elapsed_seconds;
       const end = start + 120;
-      const wolfInUnterzahl = pen.team === wolfTeam;
+      const teamInUnterzahl = pen.team === myTeam;
 
       const windowGoals = goals.filter((g) => g.elapsed_seconds > start && g.elapsed_seconds <= end);
-      const wg = windowGoals.filter((g) => g.team === wolfTeam).length;
-      const og = windowGoals.filter((g) => g.team === oppTeam).length;
+      const wg = windowGoals.filter((g) => g.team === myTeam).length;
+      const og = windowGoals.filter((g) => g.team === opp).length;
       const net = wg - og;
 
-      const cat = wolfInUnterzahl ? 'unterzahl' : 'ueberzahl';
+      const cat = teamInUnterzahl ? 'unterzahl' : 'ueberzahl';
       summary[cat].total++;
       summary[cat].goals += wg;
       summary[cat].conceded += og;
@@ -144,20 +166,23 @@ router.get('/powerplay', (req, res) => {
 
     // Gleichzahl: goals NOT in any penalty window
     const gleichzahlGoals = goals.filter((g) => !isInPenaltyWindow(g.elapsed_seconds));
-    summary.gleichzahl.goals += gleichzahlGoals.filter((g) => g.team === wolfTeam).length;
-    summary.gleichzahl.conceded += gleichzahlGoals.filter((g) => g.team === oppTeam).length;
+    summary.gleichzahl.goals += gleichzahlGoals.filter((g) => g.team === myTeam).length;
+    summary.gleichzahl.conceded += gleichzahlGoals.filter((g) => g.team === opp).length;
   }
 
   res.json(summary);
 });
 
-// GET /api/stats/comebacks - matches where Wolf was behind and didn't lose
+// GET /api/stats/comebacks - matches where team was behind and didn't lose
 router.get('/comebacks', (req, res) => {
   const db = getDb();
+  const teamId = getTeamId(req);
   const matches = db.prepare(`
-    SELECT id, home_team_name, away_team_name, home_goals, away_goals, is_home_game, starts_at
-    FROM matches WHERE state = 'Post' AND home_goals IS NOT NULL
-  `).all();
+    SELECT id, home_team_id, home_team_name, away_team_name, home_goals, away_goals, starts_at
+    FROM matches
+    WHERE state = 'Post' AND home_goals IS NOT NULL
+      AND (home_team_id = ? OR away_team_id = ?)
+  `).all(teamId, teamId);
 
   const eventsStmt = db.prepare(`
     SELECT score_home, score_away
@@ -169,23 +194,24 @@ router.get('/comebacks', (req, res) => {
   const comebacks = [];
 
   for (const m of matches) {
-    const own = m.is_home_game ? m.home_goals : m.away_goals;
-    const opp = m.is_home_game ? m.away_goals : m.home_goals;
-    if (own < opp) continue; // lost — no comeback
+    const isHome = isHomeForTeam(m, teamId);
+    const own = isHome ? m.home_goals : m.away_goals;
+    const opp = isHome ? m.away_goals : m.home_goals;
+    if (own < opp) continue;
 
     const events = eventsStmt.all(m.id);
     let minDiff = 0;
     for (const e of events) {
-      const wolfLead = m.is_home_game
+      const lead = isHome
         ? e.score_home - e.score_away
         : e.score_away - e.score_home;
-      if (wolfLead < minDiff) minDiff = wolfLead;
+      if (lead < minDiff) minDiff = lead;
     }
 
     if (minDiff < 0) {
       comebacks.push({
         id: m.id,
-        opponent: m.is_home_game ? m.away_team_name : m.home_team_name,
+        opponent: isHome ? m.away_team_name : m.home_team_name,
         deficit: -minDiff,
         finalOwn: own,
         finalOpp: opp,
@@ -203,32 +229,33 @@ router.get('/comebacks', (req, res) => {
 // Query params: location=home|away|all, half=1|2|all
 router.get('/phases/extremes', (req, res) => {
   const db = getDb();
+  const teamId = getTeamId(req);
   const { location = 'all', half = 'all' } = req.query;
 
   let locationFilter = '';
-  if (location === 'home') locationFilter = 'AND m.is_home_game = 1';
-  else if (location === 'away') locationFilter = 'AND m.is_home_game = 0';
+  if (location === 'home') locationFilter = 'AND m.home_team_id = @teamId';
+  else if (location === 'away') locationFilter = 'AND m.away_team_id = @teamId';
 
   let halfFilter = '';
   if (half === '1') halfFilter = 'AND me.elapsed_seconds < 1800';
   else if (half === '2') halfFilter = 'AND me.elapsed_seconds >= 1800';
 
   const events = db.prepare(`
-    SELECT me.team, me.elapsed_seconds, m.is_home_game
+    SELECT me.team, me.elapsed_seconds, m.home_team_id
     FROM match_events me
     JOIN matches m ON me.match_id = m.id
     WHERE me.type IN ('Goal', 'SevenMeterGoal')
       AND me.elapsed_seconds IS NOT NULL
       AND m.state = 'Post'
+      AND (m.home_team_id = @teamId OR m.away_team_id = @teamId)
       ${locationFilter}
       ${halfFilter}
-  `).all();
+  `).all({ teamId });
 
   if (events.length === 0) {
     return res.json({ powerPhase: null, deathPhase: null });
   }
 
-  // Rolling 5-minute window: start 0..55
   const maxStart = 55;
   const windowSecs = 300;
   let best = null, worst = null;
@@ -239,16 +266,16 @@ router.get('/phases/extremes', (req, res) => {
     const inWindow = events.filter(
       (e) => e.elapsed_seconds >= startSec && e.elapsed_seconds < endSec,
     );
-    let wolfGoals = 0, oppGoals = 0;
+    let tGoals = 0, oGoals = 0;
     for (const e of inWindow) {
-      const wolfTeam = e.is_home_game ? 'Home' : 'Away';
-      if (e.team === wolfTeam) wolfGoals++;
-      else oppGoals++;
+      const myTeamSide = e.home_team_id === teamId ? 'Home' : 'Away';
+      if (e.team === myTeamSide) tGoals++;
+      else oGoals++;
     }
-    const net = wolfGoals - oppGoals;
-    const entry = { start, end: start + 5, wolfGoals, oppGoals, net };
-    if (!best || net > best.net || (net === best.net && wolfGoals > best.wolfGoals)) best = entry;
-    if (!worst || net < worst.net || (net === worst.net && oppGoals > worst.oppGoals)) worst = entry;
+    const net = tGoals - oGoals;
+    const entry = { start, end: start + 5, teamGoals: tGoals, oppGoals: oGoals, net };
+    if (!best || net > best.net || (net === best.net && tGoals > best.teamGoals)) best = entry;
+    if (!worst || net < worst.net || (net === worst.net && oGoals > worst.oppGoals)) worst = entry;
   }
 
   res.json({ powerPhase: best, deathPhase: worst });
@@ -257,17 +284,20 @@ router.get('/phases/extremes', (req, res) => {
 // GET /api/stats/form - per-game data for form curve (chronological)
 router.get('/form', (req, res) => {
   const db = getDb();
+  const teamId = getTeamId(req);
   const matches = db.prepare(`
-    SELECT id, home_team_name, away_team_name, home_goals, away_goals, is_home_game, starts_at
+    SELECT id, home_team_id, home_team_name, away_team_name, home_goals, away_goals, starts_at
     FROM matches
     WHERE state = 'Post' AND home_goals IS NOT NULL
+      AND (home_team_id = ? OR away_team_id = ?)
     ORDER BY starts_at ASC
-  `).all();
+  `).all(teamId, teamId);
 
   let cumPoints = 0;
   const result = matches.map((m, i) => {
-    const own = m.is_home_game ? m.home_goals : m.away_goals;
-    const opp = m.is_home_game ? m.away_goals : m.home_goals;
+    const isHome = isHomeForTeam(m, teamId);
+    const own = isHome ? m.home_goals : m.away_goals;
+    const opp = isHome ? m.away_goals : m.home_goals;
     const diff = own - opp;
     let result, points;
     if (own > opp) { result = 'win'; points = 2; }
@@ -277,7 +307,7 @@ router.get('/form', (req, res) => {
     return {
       matchId: m.id,
       date: m.starts_at,
-      opponent: m.is_home_game ? m.away_team_name : m.home_team_name,
+      opponent: isHome ? m.away_team_name : m.home_team_name,
       own,
       opp,
       diff,
@@ -295,43 +325,46 @@ router.get('/form', (req, res) => {
 // Query params: location=home|away|all, half=1|2|all
 router.get('/goals-trend', (req, res) => {
   const db = getDb();
+  const teamId = getTeamId(req);
   const { location = 'all', half = 'all' } = req.query;
 
   let locationFilter = '';
-  if (location === 'home') locationFilter = 'AND is_home_game = 1';
-  else if (location === 'away') locationFilter = 'AND is_home_game = 0';
+  if (location === 'home') locationFilter = 'AND home_team_id = @teamId';
+  else if (location === 'away') locationFilter = 'AND away_team_id = @teamId';
 
   const matches = db.prepare(`
-    SELECT id, home_team_name, away_team_name, home_goals, away_goals,
-           home_goals_half, away_goals_half, is_home_game, starts_at, state
+    SELECT id, home_team_id, home_team_name, away_team_name, home_goals, away_goals,
+           home_goals_half, away_goals_half, starts_at, state
     FROM matches
     WHERE state = 'Post' AND home_goals IS NOT NULL
+      AND (home_team_id = @teamId OR away_team_id = @teamId)
       ${locationFilter}
     ORDER BY starts_at ASC
-  `).all();
+  `).all({ teamId });
 
   const result = matches.map((m, i) => {
+    const isHome = isHomeForTeam(m, teamId);
     let own, opp;
     if (half === '1') {
-      const ownHalf = m.is_home_game ? m.home_goals_half : m.away_goals_half;
-      const oppHalf = m.is_home_game ? m.away_goals_half : m.home_goals_half;
+      const ownHalf = isHome ? m.home_goals_half : m.away_goals_half;
+      const oppHalf = isHome ? m.away_goals_half : m.home_goals_half;
       own = ownHalf ?? null;
       opp = oppHalf ?? null;
     } else if (half === '2') {
-      const ownTotal = m.is_home_game ? m.home_goals : m.away_goals;
-      const oppTotal = m.is_home_game ? m.away_goals : m.home_goals;
-      const ownHalf = m.is_home_game ? m.home_goals_half : m.away_goals_half;
-      const oppHalf = m.is_home_game ? m.away_goals_half : m.home_goals_half;
+      const ownTotal = isHome ? m.home_goals : m.away_goals;
+      const oppTotal = isHome ? m.away_goals : m.home_goals;
+      const ownHalf = isHome ? m.home_goals_half : m.away_goals_half;
+      const oppHalf = isHome ? m.away_goals_half : m.home_goals_half;
       own = (ownHalf != null && ownTotal != null) ? ownTotal - ownHalf : null;
       opp = (oppHalf != null && oppTotal != null) ? oppTotal - oppHalf : null;
     } else {
-      own = m.is_home_game ? m.home_goals : m.away_goals;
-      opp = m.is_home_game ? m.away_goals : m.home_goals;
+      own = isHome ? m.home_goals : m.away_goals;
+      opp = isHome ? m.away_goals : m.home_goals;
     }
     return {
       matchId: m.id,
       date: m.starts_at,
-      opponent: m.is_home_game ? m.away_team_name : m.home_team_name,
+      opponent: isHome ? m.away_team_name : m.home_team_name,
       own,
       opp,
       gameIndex: i + 1,

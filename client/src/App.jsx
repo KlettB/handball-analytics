@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useTeam } from './TeamContext';
 
 function formatDate(timestamp) {
   const d = new Date(timestamp);
@@ -17,6 +18,7 @@ function formatTime(timestamp) {
 }
 
 export default function App() {
+  const { teamId, teamName } = useTeam();
   const [matches, setMatches] = useState([]);
   const [loading, setLoading] = useState(true);
   const [fetching, setFetching] = useState(false);
@@ -57,7 +59,7 @@ export default function App() {
     <div className="max-w-2xl mx-auto px-4 py-6">
       <header className="mb-6">
         <h1 className="text-2xl font-bold">Handball Analytics</h1>
-        <p className="text-sm text-gray-400">TSV Wolfschlugen — Oberliga BW</p>
+        <p className="text-sm text-gray-400">{teamName}</p>
       </header>
 
       {matches.length === 0 ? (
@@ -86,7 +88,7 @@ export default function App() {
 
           <div className="space-y-2">
             {matches.map((m) => (
-              <MatchCard key={m.id} match={m} />
+              <MatchCard key={m.id} match={m} teamId={teamId} />
             ))}
           </div>
         </>
@@ -95,9 +97,9 @@ export default function App() {
   );
 }
 
-function MatchCard({ match }) {
+function MatchCard({ match, teamId }) {
   const isFinished = match.state === 'Post';
-  const isHome = match.is_home_game === 1;
+  const isHome = match.home_team_id === teamId;
 
   let resultClass = 'text-gray-400';
   if (isFinished && match.home_goals != null) {

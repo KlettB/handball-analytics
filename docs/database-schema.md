@@ -25,8 +25,18 @@ Pragmas: `journal_mode = WAL`, `foreign_keys = ON`.
 | `referee_info` | TEXT | Schiedsrichter |
 | `attendance` | INTEGER | Zuschauer |
 | `game_number` | TEXT | Spielnummer |
-| `is_home_game` | INTEGER NOT NULL DEFAULT 0 | 1 = Wolfschlugen ist Heim |
+| `is_home_game` | INTEGER NOT NULL DEFAULT 0 | ⚠️ Deprecated — wird nicht mehr gelesen, immer 0. Heimspiel-Erkennung erfolgt zur Laufzeit über `home_team_id === teamId` |
 | `fetched_at` | TEXT | ISO-Timestamp des letzten erfolgreichen Fetches |
+
+## Tabelle: `teams`
+
+| Spalte | Typ | Beschreibung |
+|--------|-----|-------------|
+| `id` | TEXT PK | handball.net Team-ID (z.B. `handball4all.baden-wuerttemberg.1331231`) |
+| `name` | TEXT NOT NULL | Vereinsname |
+| `league` | TEXT | Liga-Name |
+
+Wird automatisch beim Ligatabellen-Fetch (`standings.js`) befüllt/aktualisiert via Upsert.
 
 ## Tabelle: `match_events`
 
@@ -52,8 +62,30 @@ Pragmas: `journal_mode = WAL`, `foreign_keys = ON`.
 - `idx_events_match` auf `match_events(match_id)` — schnelle Event-Abfrage pro Spiel
 - `idx_matches_starts` auf `matches(starts_at)` — Sortierung nach Datum
 
+## Tabelle: `standings`
+
+| Spalte | Typ | Beschreibung |
+|--------|-----|-------------|
+| `team_id` | TEXT PK | Referenz auf `teams.id` |
+| `team_name` | TEXT NOT NULL | Vereinsname |
+| `rank` | INTEGER NOT NULL | Tabellenplatz |
+| `games` | INTEGER | Spiele |
+| `wins` | INTEGER | Siege |
+| `draws` | INTEGER | Unentschieden |
+| `losses` | INTEGER | Niederlagen |
+| `goals_for` | INTEGER | Tore erzielt |
+| `goals_against` | INTEGER | Tore kassiert |
+| `goal_diff` | INTEGER | Tordifferenz |
+| `points_pos` | INTEGER | Pluspunkte |
+| `points_neg` | INTEGER | Minuspunkte |
+| `fetched_at` | TEXT | ISO-Timestamp des letzten Fetches |
+
 ## Write-Strategie
 
 - Pro Spiel als Transaction: Match upsert + alle Events (delete + re-insert)
 - `fetched_at` wird erst nach erfolgreichem Write gesetzt
 - Bei Fehler: Transaction rollback, bestehende Daten bleiben erhalten
+
+## Multi-Tenant-Design
+
+Die App ist team-agnostisch: Das „eigene" Team wird über `TEAM_ID` / `TEAM_NAME` in der ENV konfiguriert und über `/api/config` ans Frontend geliefert. Alle teamspezifischen Berechnungen (Heim/Auswärts, Sieg/Niederlage, eigene Tore) werden zur Laufzeit über `home_team_id === teamId` aufgelöst. Es gibt keine Wolfschlugen-spezifischen Spalten oder Felder in der Datenbank.

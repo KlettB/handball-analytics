@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useTeam } from '../TeamContext';
 
 function formatDate(timestamp) {
   return new Date(timestamp).toLocaleDateString('de-DE', {
@@ -17,9 +18,8 @@ function formatTime(timestamp) {
   });
 }
 
-const WOLF_ID = 'handball4all.baden-wuerttemberg.1331231';
-
 export default function MatchList() {
+  const { teamId } = useTeam();
   const [matches, setMatches] = useState([]);
   const [standings, setStandings] = useState({});
   const [loading, setLoading] = useState(true);
@@ -60,7 +60,7 @@ export default function MatchList() {
           </div>
           <div className="space-y-2">
             {matches.map((m) => (
-              <MatchCard key={m.id} match={m} standings={standings} />
+              <MatchCard key={m.id} match={m} standings={standings} teamId={teamId} />
             ))}
           </div>
         </>
@@ -73,9 +73,9 @@ function rankBadgeClass() {
   return 'text-gray-400 dark:text-gray-500';
 }
 
-function MatchCard({ match, standings }) {
+function MatchCard({ match, standings, teamId }) {
   const isFinished = match.state === 'Post';
-  const isHome = match.is_home_game === 1;
+  const isHome = match.home_team_id === teamId;
 
   const homeRank = standings[match.home_team_id];
   const awayRank = standings[match.away_team_id];

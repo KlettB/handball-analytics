@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
+import { useTeam } from '../TeamContext';
 
 export default function Players() {
+  const { teamName } = useTeam();
   const [players, setPlayers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [sortKey, setSortKey] = useState('goals');
@@ -50,7 +52,7 @@ export default function Players() {
     <div className="max-w-2xl mx-auto px-4 py-6">
       <div className="mb-4">
         <h1 className="text-xl font-bold">Spielerstatistik</h1>
-        <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">Saison 2025/26 · TSV Wolfschlugen</p>
+        <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">Saison 2025/26 · {teamName}</p>
       </div>
 
       <div className="bg-white dark:bg-gray-800 rounded-lg overflow-x-auto shadow-sm dark:shadow-none">

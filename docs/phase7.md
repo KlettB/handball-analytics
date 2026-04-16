@@ -8,7 +8,7 @@ Heute speichern wir nur Spiele von Wolfschlugen. Begegnet Wolfschlugen einem Geg
 
 ---
 
-## 7.1 Schema-Erweiterung
+## 7.1 Multi-Tenant-Umbau + Schema-Erweiterung ✅
 
 ### Neue Tabelle: `teams`
 ```sql
@@ -18,47 +18,68 @@ CREATE TABLE teams (
   league TEXT
 );
 ```
+Wird automatisch beim Standings-Fetch befüllt (Upsert pro Team).
 
-### Anpassung `matches`
-- `is_home_game` bleibt **Wolfschlugen-relativ** (1 = Wolf ist Heim), aber bei nicht-Wolf-Spielen NULL
-- Neue Spalte `is_wolf_match INTEGER DEFAULT 0` — 1 wenn Wolfschlugen beteiligt
-- Alle bestehenden Daten: `is_wolf_match = 1`
+### Neutrales Design (kein `is_wolf_match`)
+- `is_home_game` Spalte bleibt in DB (SQLite kann keine Spalten droppen), wird aber **nicht mehr gelesen** — immer `0`
+- Kein `is_wolf_match` — stattdessen rein laufzeitbasiert: `home_team_id === teamId`
+- `TEAM_ID` + `TEAM_NAME` aus ENV → `/api/config` Endpoint → `TeamContext` im Frontend
+- Alle Stats-Routen, Dashboard, MatchDetail, Team-Seite etc. nutzen dynamische Perspektive
+- Labels: "Eigene Tore" statt "Wolfschl. Tore", `{teamName}` statt hardcoded
 
-### Neue match_events-Logik
-Events werden unverändert gespeichert mit `team = 'Home'` / `team = 'Away'`. Bei der Auswertung im Frontend wird der "relevante" Team-Bezug über die View-Perspektive aufgelöst (welches Team gerade betrachtet wird).
+### match_events-Logik
+Events werden unverändert gespeichert mit `team = 'Home'` / `team = 'Away'`. Bei der Auswertung wird der Team-Bezug über die View-Perspektive aufgelöst (`teamSide(match, teamId)`).
 
 ---
 
-## 7.2 Liga-wide Fetch
+## 7.2 Liga-wide Fetch ✅
 
 ### Ablauf
-1. Aus der Ligatabelle (Phase 5) alle Team-IDs extrahieren
-2. Für jedes Team (außer Wolfschlugen, bereits vorhanden): Spielplan fetchen
-3. Für jedes Spiel das noch nicht in der DB ist: Ticker fetchen
-4. Bei Spielen zwischen zwei Nicht-Wolf-Teams: beide `is_wolf_match = 0`
-5. Deduplication über `(match_id)` — Spiele zwischen zwei Liga-Teams tauchen in beiden Spielplänen auf
+1. Aus der `teams`-Tabelle (befüllt über Standings-Fetch) alle Team-IDs extrahieren
+2. Für jedes Team (außer dem eigenen, bereits vorhanden): Spielplan fetchen
+3. Für jedes beendete Spiel das noch keine Events hat: Ticker fetchen
+4. Deduplication über `match_id` — Spiele zwischen zwei Liga-Teams tauchen in beiden Spielplänen auf, Upsert verhindert Duplikate
 
-**Neue ENV-Variable:** `FETCH_LEAGUE_WIDE=true` — opt-in, da ca. 10× mehr Requests
-**Rate Limiting:** 2s Pause zwischen Requests, ~200 Spiele × ~35s = ~20 Min Gesamtdauer
+### Implementierung
+- `fetchLeagueGames(dateFrom, dateTo)` in `server/fetcher/index.js`
+- Lädt existierende Match-IDs + Matches-mit-Events vorab aus DB → skippt bereits vorhandene Ticker
+- 2s Pause zwischen allen Requests
 
-### Neuer Fetch-Endpunkt
-`POST /api/fetch-league` — separater Admin-Endpunkt, löst Liga-wide Fetch aus (nicht im Nightly-Cron, da zu langsam — oder als separater wöchentlicher Cron)
+### Fetch-Endpunkt
+`POST /api/fetch-data/league` — separater Admin-Endpunkt mit eigenem Locking
+
+**Response:**
+```json
+{ "teams": 13, "newMatches": 34, "tickersFetched": 30, "errors": 0 }
+```
+
+### Cron (opt-in)
+- `FETCH_LEAGUE_WIDE=true` in `.env` → wöchentlicher Cron Sonntags 04:00
+- Ohne ENV-Variable: nur manuell über Admin-Endpoint
+
+### Ergebnis (erster Fetch)
+- 183 Spiele total (vorher 26), 161 mit Events, 13.165 Events (vorher ~1.500)
+- Zweiter Fetch: 0 neue Spiele, 0 Ticker → idempotent
 
 ---
 
-## 7.3 Gegner-Analyse-Seite (`/teams/:id`)
+## 7.3 Gegner-Analyse-Seite (`/teams/:id`) ✅
 
-Für jeden Gegner eine eigene Analyse-Seite — analog zur Team-Seite von Wolfschlugen, aber aus neutraler Perspektive.
+Neue Seite `OpponentDetail.jsx` unter `/teams/:teamId`.
 
 ### Tabs
-- **Übersicht**: Saison-Bilanz, Heim/Auswärts, Tordurchschnitt
-- **Phasenanalyse**: Schwächephasen, Über-/Unterzahl (aus Gegner-Sicht)
-- **Spieler**: Top-Torschützen, meiste Strafen (wer sollte man im Auge behalten?)
-- **Gegen Wolf**: Alle gemeinsamen Spiele, direkte Bilanz
+- **Übersicht**: Formkurve, Tore/Gegentore-Trend, Gesamt-Stats (Spiele, Tore/Spiel, Tordiff.), Heim vs. Auswärts
+- **Spieler**: Sortierbare Tabelle mit Toren, 7m, 2'-Strafen, Gelbe/Rote Karten
+- **Gegen uns**: Direkte Bilanz (Siege/U/N), Tore-Saldo, Liste aller gemeinsamen Spiele (klickbar)
+
+### Backend
+- Alle Stats-Endpoints (`/api/stats/*`) und `/api/matches` akzeptieren optionalen `?teamId=` Query-Param
+- Fallback auf `TEAM_ID` aus ENV wenn kein Param übergeben
 
 ### Navigation
-- Von Spielliste: Klick auf Gegner-Teamnamen → Gegner-Seite
-- Von Gegner-Vergleich (Team.jsx): Klick auf Teamnamen → Gegner-Seite
+- Tabelle (Standings): Teamname als Link → Gegner-Seite (eigenes Team nicht klickbar)
+- Team-Seite Gegner-Vergleich: Teamname als Link → Gegner-Seite
+- Tabelle als eigene Route `/standings` mit Nav-Link
 
 ---
 
@@ -67,7 +88,7 @@ Für jeden Gegner eine eigene Analyse-Seite — analog zur Team-Seite von Wolfsc
 Dedizierte Scouting-View für Spiele die noch bevorstehen (`state = 'Pre'`).
 
 ### Inhalt
-- **Kopfzeile**: Datum, Uhrzeit, Heim/Auswärts für Wolf, aktueller Tabellenplatz des Gegners
+- **Kopfzeile**: Datum, Uhrzeit, Heim/Auswärts, aktueller Tabellenplatz des Gegners
 - **Gegner-Saison-Bilanz**: Siege/Unentschieden/Niederlagen, Tordurchschnitt, Heimstärke vs. Auswärts
 - **Formkurve des Gegners**: Letzte 5 Spiele (S/U/N-Badges)
 - **Stärken**: In welcher Phase trifft der Gegner am häufigsten? (Power-Phase des Gegners)
@@ -85,9 +106,8 @@ Dedizierte Scouting-View für Spiele die noch bevorstehen (`state = 'Pre'`).
 - Phase 5 muss abgeschlossen sein (Ligatabelle → Team-IDs)
 - Phase 6 ist unabhängig, sollte aber vorher fertig sein (Formkurve-Logik wird wiederverwendet)
 
-## Datenmenge (Schätzung)
-- Liga: ~12 Teams, ~22 Spieltage, ~120 Spiele total (inkl. Wolf-Spiele)
-- Events: ~60 Events/Spiel × 120 Spiele = ~7.200 Events
-- SQLite verkraftet das problemlos (aktuell ~1.500 Events für Wolf allein)
+## Datenmenge (gemessen)
+- 14 Teams, ~183 Spiele total (inkl. eigene Spiele), 13.165 Events
+- SQLite verkraftet das problemlos
 
-## Status: TODO
+## Status: 7.1–7.3 DONE — 7.4 TODO

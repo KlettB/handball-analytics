@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
+import { useTeam } from '../TeamContext';
 import LeadTracker from '../components/LeadTracker';
 import MomentumChart from '../components/MomentumChart';
 
@@ -137,9 +138,8 @@ function analyzeTimeouts(events) {
   });
 }
 
-function analyzePenaltySessions(events, isHomeGame) {
-  const wolfTeam = isHomeGame === 1 ? 'Home' : 'Away';
-  const oppTeam = isHomeGame === 1 ? 'Away' : 'Home';
+function analyzePenaltySessions(events, myTeam) {
+  const oppTeam = myTeam === 'Home' ? 'Away' : 'Home';
 
   const penalties = events
     .filter((e) => e.type === 'TwoMinutePenalty' && e.elapsed_seconds != null)
@@ -152,7 +152,7 @@ function analyzePenaltySessions(events, isHomeGame) {
   return penalties.map((pen) => {
     const start = pen.elapsed_seconds;
     const end = start + 120;
-    const wolfInUnterzahl = pen.team === wolfTeam;
+    const teamInUnterzahl = pen.team === myTeam;
 
     // Check if the opposing team also gets penalized during this window
     // (→ Gleichzahl wieder) or same team gets another penalty (→ doppelte Unterzahl)
@@ -165,15 +165,15 @@ function analyzePenaltySessions(events, isHomeGame) {
     const windowGoals = goals.filter(
       (g) => g.elapsed_seconds > start && g.elapsed_seconds <= end
     );
-    const wolfGoals = windowGoals.filter((g) => g.team === wolfTeam).length;
+    const teamGoals = windowGoals.filter((g) => g.team === myTeam).length;
     const oppGoals = windowGoals.filter((g) => g.team === oppTeam).length;
-    const net = wolfGoals - oppGoals;
+    const net = teamGoals - oppGoals;
 
     return {
       time: pen.time,
       playerName: pen.player_name,
-      wolfInUnterzahl,
-      wolfGoals,
+      teamInUnterzahl,
+      teamGoals,
       oppGoals,
       net,
       equalizer: equalizer ? equalizer.time : null,
@@ -182,16 +182,15 @@ function analyzePenaltySessions(events, isHomeGame) {
   });
 }
 
-function detectMatchPhaseExtremes(events, isHomeGame) {
-  const wolfTeam = isHomeGame === 1 ? 'Home' : 'Away';
+function detectMatchPhaseExtremes(events, myTeam) {
   const goals = events
     .filter((e) => ['Goal', 'SevenMeterGoal'].includes(e.type) && e.elapsed_seconds != null)
     .sort((a, b) => a.elapsed_seconds - b.elapsed_seconds);
   if (goals.length < 2) return null;
 
-  // Build sequence: +1 for Wolfschlugen goal, -1 for opponent goal
+  // Build sequence: +1 for own goal, -1 for opponent goal
   const seq = goals.map((e) => ({
-    value: e.team === wolfTeam ? 1 : -1,
+    value: e.team === myTeam ? 1 : -1,
     minute: Math.ceil(e.elapsed_seconds / 60),
   }));
 
@@ -213,12 +212,12 @@ function detectMatchPhaseExtremes(events, isHomeGame) {
     }
     if (!isFinite(bestSum)) return null;
     const subSeq = arr.slice(bestStart, bestEnd + 1);
-    const wolf = subSeq.filter((s) => s.value === 1).length;
+    const own = subSeq.filter((s) => s.value === 1).length;
     const opp = subSeq.filter((s) => s.value === -1).length;
     return {
       startMinute: arr[bestStart].minute,
       endMinute: arr[bestEnd].minute,
-      wolfGoals: wolf,
+      teamGoals: own,
       oppGoals: opp,
       net: bestSum,
     };
@@ -233,12 +232,11 @@ function detectMatchPhaseExtremes(events, isHomeGame) {
   };
 }
 
-function buildPlayerStats(events, isHomeGame) {
-  const wolfTeam = isHomeGame === 1 ? 'Home' : 'Away';
+function buildPlayerStats(events, myTeam) {
   const map = {};
 
   for (const e of events) {
-    if (e.team !== wolfTeam || !e.player_name) continue;
+    if (e.team !== myTeam || !e.player_name) continue;
     const p = map[e.player_name] || {
       name: e.player_name,
       number: e.player_number,
@@ -370,13 +368,13 @@ function TabSpieldverlauf({ events, homeTeamName, awayTeamName }) {
   );
 }
 
-function TabAnalyse({ events, match }) {
+function TabAnalyse({ events, match, teamId, teamName }) {
+  const myTeam = match.home_team_id === teamId ? 'Home' : 'Away';
   const runs = detectRuns(events);
   const halftime = getHalftimeFromEvents(events);
   const timeouts = analyzeTimeouts(events);
-  const penaltySessions = analyzePenaltySessions(events, match.is_home_game);
-  const phaseExtremes = detectMatchPhaseExtremes(events, match.is_home_game);
-  const wolfTeam = match.is_home_game ? 'Home' : 'Away';
+  const penaltySessions = analyzePenaltySessions(events, myTeam);
+  const phaseExtremes = detectMatchPhaseExtremes(events, myTeam);
 
   const finalHome = match.home_goals ?? 0;
   const finalAway = match.away_goals ?? 0;
@@ -409,8 +407,8 @@ function TabAnalyse({ events, match }) {
               </div>
               <div className="space-y-1 text-xs">
                 <div className="flex justify-between">
-                  <span className="text-gray-600 dark:text-gray-400">Wolfschl. Tore</span>
-                  <span className="font-medium text-green-400">{phaseExtremes.powerPhase.wolfGoals}</span>
+                  <span className="text-gray-600 dark:text-gray-400">Eigene Tore</span>
+                  <span className="font-medium text-green-400">{phaseExtremes.powerPhase.teamGoals}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600 dark:text-gray-400">Gegentore</span>
@@ -433,8 +431,8 @@ function TabAnalyse({ events, match }) {
               </div>
               <div className="space-y-1 text-xs">
                 <div className="flex justify-between">
-                  <span className="text-gray-600 dark:text-gray-400">Wolfschl. Tore</span>
-                  <span className="font-medium text-green-400">{phaseExtremes.deathPhase.wolfGoals}</span>
+                  <span className="text-gray-600 dark:text-gray-400">Eigene Tore</span>
+                  <span className="font-medium text-green-400">{phaseExtremes.deathPhase.teamGoals}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600 dark:text-gray-400">Gegentore</span>
@@ -490,14 +488,14 @@ function TabAnalyse({ events, match }) {
         ) : (
           <div className="space-y-2">
             {runs.map((r, i) => {
-              const isWolf = r.team === wolfTeam;
+              const isMyTeam = r.team === myTeam;
               return (
                 <div
                   key={i}
-                  className={`rounded p-3 text-sm ${isWolf ? 'bg-green-50 border border-green-200 dark:bg-green-900/30 dark:border-green-800/50' : 'bg-red-50 border border-red-200 dark:bg-red-900/30 dark:border-red-800/50'}`}
+                  className={`rounded p-3 text-sm ${isMyTeam ? 'bg-green-50 border border-green-200 dark:bg-green-900/30 dark:border-green-800/50' : 'bg-red-50 border border-red-200 dark:bg-red-900/30 dark:border-red-800/50'}`}
                 >
                   <div className="flex items-center justify-between mb-1">
-                    <span className={`font-bold ${isWolf ? 'text-green-400' : 'text-red-400'}`}>
+                    <span className={`font-bold ${isMyTeam ? 'text-green-400' : 'text-red-400'}`}>
                       {r.goals}:0 Lauf
                     </span>
                     <span className="text-gray-500 dark:text-gray-400 text-xs">
@@ -506,11 +504,7 @@ function TabAnalyse({ events, match }) {
                     </span>
                   </div>
                   <div className="text-gray-500 dark:text-gray-400 text-xs">
-                    {isWolf
-                      ? match.home_team_name === 'TSV Wolfschlugen' || match.is_home_game
-                        ? 'TSV Wolfschlugen'
-                        : 'TSV Wolfschlugen'
-                      : r.team === 'Home'
+                    {r.team === 'Home'
                       ? match.home_team_name
                       : match.away_team_name}
                     {' · '}
@@ -532,11 +526,11 @@ function TabAnalyse({ events, match }) {
 
           {/* Summary cards */}
           {(() => {
-            const ueber = penaltySessions.filter((s) => !s.wolfInUnterzahl);
-            const unter = penaltySessions.filter((s) => s.wolfInUnterzahl);
+            const ueber = penaltySessions.filter((s) => !s.teamInUnterzahl);
+            const unter = penaltySessions.filter((s) => s.teamInUnterzahl);
             const summary = (list) => ({
               total: list.length,
-              goals: list.reduce((s, p) => s + p.wolfGoals, 0),
+              goals: list.reduce((s, p) => s + p.teamGoals, 0),
               conceded: list.reduce((s, p) => s + p.oppGoals, 0),
               won: list.filter((p) => p.net > 0).length,
               neutral: list.filter((p) => p.net === 0).length,
@@ -577,7 +571,7 @@ function TabAnalyse({ events, match }) {
 
           <div className="space-y-1">
             {penaltySessions.map((s, i) => {
-              const isUeber = !s.wolfInUnterzahl;
+              const isUeber = !s.teamInUnterzahl;
               const netColor =
                 s.net > 0 ? 'text-green-400' : s.net < 0 ? 'text-red-400' : 'text-gray-400';
               return (
@@ -601,7 +595,7 @@ function TabAnalyse({ events, match }) {
                     {s.playerName && (
                       <span className="text-gray-700 dark:text-gray-300">{s.playerName} · </span>
                     )}
-                    {s.wolfGoals}:{s.oppGoals} Tore
+                    {s.teamGoals}:{s.oppGoals} Tore
                     {s.equalizer && (
                       <span className="text-yellow-500 ml-1">
                         · Gleichzahl ab {s.equalizer}
@@ -628,24 +622,24 @@ function TabAnalyse({ events, match }) {
           <h2 className="text-base font-semibold mb-3">Auszeit-Effektivität</h2>
           <div className="space-y-2">
             {timeouts.map((t, i) => {
-              const isWolf = t.team === wolfTeam;
-              // Always express goals from Wolf's perspective
-              const wolfGoalsAfter = isWolf ? t.forGoals : t.againstGoals;
-              const oppGoalsAfter = isWolf ? t.againstGoals : t.forGoals;
-              const positive = wolfGoalsAfter > oppGoalsAfter;
-              const neutral = wolfGoalsAfter === oppGoalsAfter;
+              const isMyTeam = t.team === myTeam;
+              // Express goals from own team's perspective
+              const teamGoalsAfter = isMyTeam ? t.forGoals : t.againstGoals;
+              const oppGoalsAfter = isMyTeam ? t.againstGoals : t.forGoals;
+              const positive = teamGoalsAfter > oppGoalsAfter;
+              const neutral = teamGoalsAfter === oppGoalsAfter;
               const ne = t.nextEvent;
-              const nextIsWolf = ne && ne.team === wolfTeam;
+              const nextIsMyTeam = ne && ne.team === myTeam;
               const nextLabel = ne ? (EVENT_LABELS[ne.type] || ne.type) : null;
               const nextTeamName = ne
-                ? (nextIsWolf ? 'TSV Wolfschlugen' : ne.team === 'Home' ? match.home_team_name : match.away_team_name)
+                ? (ne.team === 'Home' ? match.home_team_name : match.away_team_name)
                 : null;
               return (
                 <div key={i} className="py-2 border-b border-gray-100 dark:border-gray-700 last:border-0 text-sm">
                   <div className="flex items-center gap-3">
                     <span className="text-gray-400 dark:text-gray-500 font-mono w-10 text-right shrink-0">{t.time}</span>
                     <span className="text-blue-400 shrink-0">
-                      Auszeit {isWolf ? 'TSV Wolfschlugen' : t.team === 'Home' ? match.home_team_name : match.away_team_name}
+                      Auszeit {t.team === 'Home' ? match.home_team_name : match.away_team_name}
                     </span>
                     <span className="flex-1" />
                     <div className="text-right">
@@ -653,7 +647,7 @@ function TabAnalyse({ events, match }) {
                         {t.cutShort
                           ? `${Math.floor(t.windowSeconds / 60)}:${String(t.windowSeconds % 60).padStart(2, '0')} Min: `
                           : '4 Min danach: '
-                        }{wolfGoalsAfter}:{oppGoalsAfter}
+                        }{teamGoalsAfter}:{oppGoalsAfter}
                       </span>
                       {t.cutShort && t.cutReason && (
                         <div className="text-xs text-gray-400 dark:text-gray-600">
@@ -678,7 +672,7 @@ function TabAnalyse({ events, match }) {
             })}
           </div>
           <p className="text-xs text-gray-400 dark:text-gray-600 mt-2">
-            Tore Wolf:Gegner · Fenster 4 Min, begrenzt auf Halbzeitende
+            Tore Eigene:Gegner · Fenster 4 Min, begrenzt auf Halbzeitende
           </p>
         </div>
       )}
@@ -686,8 +680,9 @@ function TabAnalyse({ events, match }) {
   );
 }
 
-function TabSpieler({ events, match }) {
-  const players = buildPlayerStats(events, match.is_home_game);
+function TabSpieler({ events, match, teamId }) {
+  const myTeam = match.home_team_id === teamId ? 'Home' : 'Away';
+  const players = buildPlayerStats(events, myTeam);
 
   if (players.length === 0) {
     return (
@@ -756,6 +751,7 @@ const TABS = [
 
 export default function MatchDetail() {
   const { id } = useParams();
+  const { teamId, teamName } = useTeam();
   const [match, setMatch] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('verlauf');
@@ -851,8 +847,8 @@ export default function MatchDetail() {
           awayTeamName={match.away_team_name}
         />
       )}
-      {activeTab === 'analyse' && <TabAnalyse events={events} match={match} />}
-      {activeTab === 'spieler' && <TabSpieler events={events} match={match} />}
+      {activeTab === 'analyse' && <TabAnalyse events={events} match={match} teamId={teamId} teamName={teamName} />}
+      {activeTab === 'spieler' && <TabSpieler events={events} match={match} teamId={teamId} />}
     </div>
   );
 }

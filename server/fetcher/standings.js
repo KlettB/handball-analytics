@@ -38,6 +38,12 @@ async function fetchStandings() {
   }
 
   const db = getDb();
+
+  const upsertTeam = db.prepare(`
+    INSERT INTO teams (id, name, league) VALUES (@id, @name, @league)
+    ON CONFLICT(id) DO UPDATE SET name = @name, league = @league
+  `);
+
   const upsert = db.prepare(`
     INSERT INTO standings
       (team_id, team_name, rank, games, wins, draws, losses,
@@ -52,9 +58,12 @@ async function fetchStandings() {
       points_pos = @points_pos, points_neg = @points_neg, fetched_at = @fetched_at
   `);
 
+  const leagueName = unique[0]?.team?.tournament?.name || null;
   const now = new Date().toISOString();
   const transaction = db.transaction(() => {
     for (const e of unique) {
+      upsertTeam.run({ id: e.team.id, name: e.team.name, league: leagueName });
+
       // points format is "38:8" (positive:negative)
       const [pointsPos, pointsNeg] = String(e.points).split(':').map(Number);
       upsert.run({

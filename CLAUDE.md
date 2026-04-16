@@ -23,8 +23,10 @@ WebApp die Spielverlaufsdaten von handball.net per RSC-API abruft, in SQLite spe
 ## Konfiguration (Environment)
 ```
 TEAM_ID=handball4all.baden-wuerttemberg.1331231
+TEAM_NAME=TSV Wolfschlugen
 SEASON_START=2025-07-01
 SEASON_END=2026-06-30
+FETCH_LEAGUE_WIDE=false          # true → wöchentlicher Cron für Liga-weiten Fetch
 ```
 
 ## Kern-Prinzip

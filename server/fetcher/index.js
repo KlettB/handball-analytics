@@ -51,9 +51,8 @@ function parseScore(scoreStr) {
 /**
  * Save a game and its events to the database.
  */
-function saveGame(game, events, teamId) {
+function saveGame(game, events) {
   const db = getDb();
-  const isHome = game.homeTeam?.id === teamId;
 
   const upsertMatch = db.prepare(`
     INSERT INTO matches (id, home_team_id, home_team_name, away_team_id, away_team_name,
@@ -97,7 +96,7 @@ function saveGame(game, events, teamId) {
       referee_info: game.refereeInfo || null,
       attendance: game.attendance ?? null,
       game_number: game.gameNumber || null,
-      is_home_game: isHome ? 1 : 0,
+      is_home_game: 0,
       fetched_at: new Date().toISOString(),
     });
 
@@ -156,7 +155,7 @@ async function fetchAllGames(teamId, dateFrom, dateTo) {
 
       // Use the ticker's fullGame if available (has more data), fallback to schedule game
       const gameData = fullGame || game;
-      saveGame(gameData, events || [], teamId);
+      saveGame(gameData, events || []);
 
       fetched++;
       console.log(`[fetcher]   -> ${events?.length || 0} events saved`);
@@ -170,7 +169,7 @@ async function fetchAllGames(teamId, dateFrom, dateTo) {
   const upcomingGames = games.filter((g) => g.state !== 'Post');
   for (const game of upcomingGames) {
     try {
-      saveGame(game, [], teamId);
+      saveGame(game, []);
     } catch (err) {
       console.error(`[fetcher] Error saving upcoming game ${game.id}: ${err.message}`);
     }
@@ -186,4 +185,89 @@ async function fetchAllGames(teamId, dateFrom, dateTo) {
   return summary;
 }
 
-module.exports = { fetchAllGames };
+/**
+ * Fetch games for all league teams (except the configured own team).
+ * Only fetches ticker data for finished games that have no events yet.
+ */
+async function fetchLeagueGames(dateFrom, dateTo) {
+  const db = getDb();
+  const ownTeamId = process.env.TEAM_ID || '';
+
+  const teams = db.prepare('SELECT id, name FROM teams WHERE id != ?').all(ownTeamId);
+  if (teams.length === 0) {
+    console.log('[league-fetch] No teams found in DB. Run standings fetch first.');
+    return { teams: 0, newMatches: 0, tickersFetched: 0, errors: 0 };
+  }
+
+  console.log(`[league-fetch] Fetching schedules for ${teams.length} teams (${dateFrom} – ${dateTo})`);
+
+  const existingMatchIds = new Set(
+    db.prepare('SELECT id FROM matches').all().map((r) => r.id)
+  );
+  const matchesWithEvents = new Set(
+    db.prepare('SELECT DISTINCT match_id FROM match_events').all().map((r) => r.match_id)
+  );
+
+  const allGames = new Map();
+  let errors = 0;
+
+  for (const team of teams) {
+    try {
+      await sleep(2000);
+      console.log(`[league-fetch] Fetching schedule for ${team.name}...`);
+      const scheduleRsc = await fetchSchedule(team.id, dateFrom, dateTo);
+      const games = extractGames(scheduleRsc);
+
+      for (const game of games) {
+        if (!allGames.has(game.id)) {
+          allGames.set(game.id, game);
+        }
+      }
+      console.log(`[league-fetch]   -> ${games.length} games found`);
+    } catch (err) {
+      errors++;
+      console.error(`[league-fetch] Error fetching schedule for ${team.name}: ${err.message}`);
+    }
+  }
+
+  console.log(`[league-fetch] ${allGames.size} unique games across all teams`);
+
+  let newMatches = 0;
+  let tickersFetched = 0;
+
+  for (const [gameId, game] of allGames) {
+    try {
+      const isFinished = game.state === 'Post';
+      const needsTicker = isFinished && !matchesWithEvents.has(gameId);
+
+      if (needsTicker) {
+        await sleep(2000);
+        console.log(`[league-fetch] Fetching ticker for ${gameId} (${game.homeTeam?.name} vs ${game.awayTeam?.name})...`);
+        const tickerRsc = await fetchTicker(gameId);
+        const { game: fullGame, events } = extractTickerData(tickerRsc);
+        saveGame(fullGame || game, events || []);
+        tickersFetched++;
+      } else if (!existingMatchIds.has(gameId)) {
+        saveGame(game, []);
+      }
+
+      if (!existingMatchIds.has(gameId)) {
+        newMatches++;
+      }
+    } catch (err) {
+      errors++;
+      console.error(`[league-fetch] Error processing ${gameId}: ${err.message}`);
+    }
+  }
+
+  const summary = {
+    teams: teams.length,
+    newMatches,
+    tickersFetched,
+    errors,
+  };
+  console.log('[league-fetch] Done.', summary);
+  return summary;
+}
+
+module.exports = { fetchAllGames, fetchLeagueGames };

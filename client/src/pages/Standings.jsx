@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { useTeam } from '../TeamContext';
 
-const WOLF_ID = 'handball4all.baden-wuerttemberg.1331231';
 const TOTAL_TEAMS = 14;
 // Bottom 2 are relegated, top 2 promoted (adjust if known)
 const RELEGATION_ZONE = TOTAL_TEAMS - 1; // rank >= this = danger
@@ -13,6 +14,7 @@ function rankBadgeClass(rank) {
 }
 
 export default function Standings() {
+  const { teamId } = useTeam();
   const [standings, setStandings] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -71,7 +73,7 @@ export default function Standings() {
           </thead>
           <tbody>
             {standings.map((s, idx) => {
-              const isWolf = s.team_id === WOLF_ID;
+              const isMyTeam = s.team_id === teamId;
               const isPromotionZone = s.rank <= 2;
               const isRelegationZone = s.rank >= TOTAL_TEAMS - 1;
 
@@ -83,7 +85,7 @@ export default function Standings() {
                 <tr
                   key={s.team_id}
                   className={`border-b border-gray-100 dark:border-gray-700 last:border-0 text-sm ${
-                    isWolf ? 'bg-blue-50 dark:bg-blue-900/20' : ''
+                    isMyTeam ? 'bg-blue-50 dark:bg-blue-900/20' : ''
                   } ${showPromotionBorder ? 'border-t-2 border-t-green-300 dark:border-t-green-700' : ''} ${showRelegationBorder ? 'border-t-2 border-t-red-300 dark:border-t-red-800' : ''}`}
                 >
                   <td className="px-3 py-2.5 text-center">
@@ -92,11 +94,15 @@ export default function Standings() {
                     </span>
                   </td>
                   <td className="px-2 py-2.5">
-                    <span className={`font-medium ${isWolf ? 'text-blue-700 dark:text-blue-300' : 'text-gray-900 dark:text-white'}`}>
-                      {s.team_name}
-                    </span>
-                    {isWolf && (
-                      <span className="ml-1.5 text-xs text-blue-500 dark:text-blue-400">◀</span>
+                    {isMyTeam ? (
+                      <span className="font-medium text-blue-700 dark:text-blue-300">
+                        {s.team_name}
+                        <span className="ml-1.5 text-xs text-blue-500 dark:text-blue-400">◀</span>
+                      </span>
+                    ) : (
+                      <Link to={`/teams/${s.team_id}`} className="font-medium text-gray-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400">
+                        {s.team_name}
+                      </Link>
                     )}
                   </td>
                   <td className="px-2 py-2.5 text-center text-gray-600 dark:text-gray-400">{s.games}</td>

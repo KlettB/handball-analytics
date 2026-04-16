@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useTeam } from '../TeamContext';
 
 function formatDate(ts) {
   return new Date(ts).toLocaleDateString('de-DE', {
@@ -16,13 +17,25 @@ function formatTime(ts) {
   });
 }
 
-function computeStats(matches) {
+function isHome(m, teamId) {
+  return m.home_team_id === teamId;
+}
+
+function ownGoals(m, teamId) {
+  return isHome(m, teamId) ? m.home_goals : m.away_goals;
+}
+
+function oppGoals(m, teamId) {
+  return isHome(m, teamId) ? m.away_goals : m.home_goals;
+}
+
+function computeStats(matches, teamId) {
   const finished = matches.filter((m) => m.state === 'Post' && m.home_goals != null);
   let wins = 0, draws = 0, losses = 0, goalsFor = 0, goalsAgainst = 0;
 
   for (const m of finished) {
-    const own = m.is_home_game ? m.home_goals : m.away_goals;
-    const opp = m.is_home_game ? m.away_goals : m.home_goals;
+    const own = ownGoals(m, teamId);
+    const opp = oppGoals(m, teamId);
     goalsFor += own;
     goalsAgainst += opp;
     if (own > opp) wins++;
@@ -33,25 +46,24 @@ function computeStats(matches) {
   return { played: finished.length, wins, draws, losses, goalsFor, goalsAgainst };
 }
 
-function resultColor(m) {
+function resultColor(m, teamId) {
   if (m.state !== 'Post' || m.home_goals == null) return 'bg-gray-400 dark:bg-gray-600';
-  const own = m.is_home_game ? m.home_goals : m.away_goals;
-  const opp = m.is_home_game ? m.away_goals : m.home_goals;
+  const own = ownGoals(m, teamId);
+  const opp = oppGoals(m, teamId);
   if (own > opp) return 'bg-green-500';
   if (own < opp) return 'bg-red-500';
   return 'bg-yellow-500';
 }
 
-function resultLabel(m) {
+function resultLabel(m, teamId) {
   if (m.state !== 'Post' || m.home_goals == null) return '–';
-  const own = m.is_home_game ? m.home_goals : m.away_goals;
-  const opp = m.is_home_game ? m.away_goals : m.home_goals;
+  const own = ownGoals(m, teamId);
+  const opp = oppGoals(m, teamId);
   if (own > opp) return 'S';
   if (own < opp) return 'N';
   return 'U';
 }
 
-const WOLF_ID = 'handball4all.baden-wuerttemberg.1331231';
 const TOTAL_TEAMS = 14;
 
 function standingRowClass(rank) {
@@ -61,6 +73,7 @@ function standingRowClass(rank) {
 }
 
 export default function Dashboard() {
+  const { teamId, teamName } = useTeam();
   const [matches, setMatches] = useState([]);
   const [standings, setStandings] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -83,7 +96,7 @@ export default function Dashboard() {
     );
   }
 
-  const stats = computeStats(matches);
+  const stats = computeStats(matches, teamId);
   const finished = matches.filter((m) => m.state === 'Post' && m.home_goals != null);
   const recentFive = [...finished].slice(0, 5);
   const upcoming = matches.filter((m) => m.state !== 'Post').slice(-5).reverse();
@@ -91,14 +104,14 @@ export default function Dashboard() {
   const formData = [...finished]
     .sort((a, b) => new Date(a.starts_at) - new Date(b.starts_at))
     .map((m) => {
-      const own = m.is_home_game ? m.home_goals : m.away_goals;
-      const opp = m.is_home_game ? m.away_goals : m.home_goals;
+      const own = ownGoals(m, teamId);
+      const opp = oppGoals(m, teamId);
       return {
         id: m.id,
         diff: own - opp,
         own,
         opp,
-        opponent: m.is_home_game ? m.away_team_name : m.home_team_name,
+        opponent: isHome(m, teamId) ? m.away_team_name : m.home_team_name,
       };
     });
 
@@ -141,20 +154,20 @@ export default function Dashboard() {
           </div>
           <div className="space-y-0">
             {standings.map((s) => {
-              const isWolf = s.team_id === WOLF_ID;
+              const isMyTeam = s.team_id === teamId;
               const showPromotionBorder = s.rank === 3;
               const showRelegationBorder = s.rank === TOTAL_TEAMS - 2;
               return (
                 <div
                   key={s.team_id}
-                  className={`flex items-center gap-2 py-1.5 text-sm ${showPromotionBorder ? 'border-t border-t-green-300 dark:border-t-green-700' : showRelegationBorder ? 'border-t border-t-red-300 dark:border-t-red-800' : 'border-t border-gray-50 dark:border-gray-700/50'} ${isWolf ? 'font-semibold' : ''}`}
+                  className={`flex items-center gap-2 py-1.5 text-sm ${showPromotionBorder ? 'border-t border-t-green-300 dark:border-t-green-700' : showRelegationBorder ? 'border-t border-t-red-300 dark:border-t-red-800' : 'border-t border-gray-50 dark:border-gray-700/50'} ${isMyTeam ? 'font-semibold' : ''}`}
                 >
                   <span className={`w-5 text-right text-xs shrink-0 font-medium ${standingRowClass(s.rank)}`}>
                     {s.rank}
                   </span>
-                  <span className={`flex-1 truncate ${isWolf ? 'text-blue-700 dark:text-blue-300' : 'text-gray-700 dark:text-gray-300'}`}>
+                  <span className={`flex-1 truncate ${isMyTeam ? 'text-blue-700 dark:text-blue-300' : 'text-gray-700 dark:text-gray-300'}`}>
                     {s.team_name}
-                    {isWolf && <span className="ml-1 text-blue-400 text-xs">◀</span>}
+                    {isMyTeam && <span className="ml-1 text-blue-400 text-xs">◀</span>}
                   </span>
                   <span className="text-xs text-gray-400 dark:text-gray-500 w-6 text-center shrink-0">{s.games}</span>
                   <span className={`text-xs font-bold w-10 text-right shrink-0 ${standingRowClass(s.rank)}`}>
@@ -173,13 +186,13 @@ export default function Dashboard() {
           <h2 className="text-sm text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-4">Letzte 5 Spiele</h2>
           <div className="space-y-2">
             {recentFive.map((m) => {
-              const own = m.is_home_game ? m.home_goals : m.away_goals;
-              const opp = m.is_home_game ? m.away_goals : m.home_goals;
-              const opponent = m.is_home_game ? m.away_team_name : m.home_team_name;
+              const own = ownGoals(m, teamId);
+              const opp = oppGoals(m, teamId);
+              const opponent = isHome(m, teamId) ? m.away_team_name : m.home_team_name;
               return (
                 <Link key={m.id} to={`/matches/${m.id}`} className="flex items-center gap-3 hover:opacity-80">
-                  <span className={`w-6 h-6 rounded text-xs font-bold flex items-center justify-center text-white shrink-0 ${resultColor(m)}`}>
-                    {resultLabel(m)}
+                  <span className={`w-6 h-6 rounded text-xs font-bold flex items-center justify-center text-white shrink-0 ${resultColor(m, teamId)}`}>
+                    {resultLabel(m, teamId)}
                   </span>
                   <span className="text-xs text-gray-400 dark:text-gray-500 w-24 shrink-0">{formatDate(m.starts_at)}</span>
                   <span className="flex-1 truncate text-sm">{opponent}</span>
@@ -237,16 +250,16 @@ export default function Dashboard() {
           <h2 className="text-sm text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-4">Nächste Spiele</h2>
           <div className="space-y-2">
             {upcoming.map((m) => {
-              const opponent = m.is_home_game ? m.away_team_name : m.home_team_name;
-              const isHome = m.is_home_game === 1;
+              const opponent = isHome(m, teamId) ? m.away_team_name : m.home_team_name;
+              const home = isHome(m, teamId);
               return (
                 <div key={m.id} className="flex items-center gap-3">
                   <span className={`w-6 h-6 rounded text-xs font-bold flex items-center justify-center shrink-0 border-2 bg-transparent ${
-                    isHome
+                    home
                       ? 'border-green-500 text-green-500'
                       : 'border-red-500 text-red-500'
                   }`}>
-                    {isHome ? 'H' : 'A'}
+                    {home ? 'H' : 'A'}
                   </span>
                   <span className="text-xs text-gray-400 dark:text-gray-500 w-24 shrink-0">{formatDate(m.starts_at)}</span>
                   <span className="flex-1 truncate text-sm">{opponent}</span>
