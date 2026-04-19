@@ -169,9 +169,25 @@ function analyzePenaltySessions(events, myTeam) {
     const oppGoals = windowGoals.filter((g) => g.team === oppTeam).length;
     const net = teamGoals - oppGoals;
 
+    // Compute actual end: earliest interruption or nominal end
+    const interruptAt = equalizer
+      ? equalizer.elapsed_seconds
+      : doubler
+      ? doubler.elapsed_seconds
+      : null;
+    const actualEndSeconds = interruptAt != null ? interruptAt : end;
+    const durationSeconds = actualEndSeconds - start;
+
+    const fmtTime = (secs) => {
+      const m = Math.floor(secs / 60);
+      const s = String(secs % 60).padStart(2, '0');
+      return `${m}:${s}`;
+    };
+
     return {
       time: pen.time,
-      playerName: pen.player_name,
+      endTime: fmtTime(actualEndSeconds),
+      durationSeconds,
       teamInUnterzahl,
       teamGoals,
       oppGoals,
@@ -574,16 +590,15 @@ function TabAnalyse({ events, match, teamId, teamName }) {
               const isUeber = !s.teamInUnterzahl;
               const netColor =
                 s.net > 0 ? 'text-green-400' : s.net < 0 ? 'text-red-400' : 'text-gray-400';
+              const shortened = s.durationSeconds < 120;
               return (
                 <div
                   key={i}
-                  className="flex items-start gap-2 py-2 border-b border-gray-100 dark:border-gray-700 last:border-0 text-sm"
+                  className="flex items-center gap-2 py-2 border-b border-gray-100 dark:border-gray-700 last:border-0 text-xs"
                 >
-                  <span className="text-gray-400 dark:text-gray-500 font-mono w-10 text-right shrink-0">
-                    {s.time}
-                  </span>
+                  {/* Badge */}
                   <span
-                    className={`shrink-0 font-medium text-xs px-1.5 py-0.5 rounded ${
+                    className={`shrink-0 font-medium px-1.5 py-0.5 rounded ${
                       isUeber
                         ? 'bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-400'
                         : 'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-400'
@@ -591,23 +606,24 @@ function TabAnalyse({ events, match, teamId, teamName }) {
                   >
                     {isUeber ? 'Überzahl' : 'Unterzahl'}
                   </span>
-                  <span className="flex-1 min-w-0 text-gray-500 dark:text-gray-400 text-xs">
-                    {s.playerName && (
-                      <span className="text-gray-700 dark:text-gray-300">{s.playerName} · </span>
-                    )}
-                    {s.teamGoals}:{s.oppGoals} Tore
-                    {s.equalizer && (
-                      <span className="text-yellow-500 ml-1">
-                        · Gleichzahl ab {s.equalizer}
-                      </span>
-                    )}
-                    {s.doubler && (
-                      <span className="text-red-500 ml-1">
-                        · 2. Strafe ab {s.doubler}
+
+                  {/* Time range + interruption note */}
+                  <span className="flex-1 min-w-0 text-gray-500 dark:text-gray-400 font-mono">
+                    {s.time} – {s.endTime}
+                    {shortened && (
+                      <span className="font-sans ml-1 text-gray-400 dark:text-gray-500">
+                        · {s.durationSeconds}s
+                        {s.equalizer && ` – Gleichzahl ab ${s.equalizer}`}
+                        {s.doubler && ` – 2. Strafe ab ${s.doubler}`}
                       </span>
                     )}
                   </span>
-                  <span className={`font-bold shrink-0 ${netColor}`}>
+
+                  {/* Result */}
+                  <span className="shrink-0 text-gray-400 dark:text-gray-500">
+                    {s.teamGoals}:{s.oppGoals}
+                  </span>
+                  <span className={`font-bold shrink-0 w-6 text-right ${netColor}`}>
                     {s.net > 0 ? `+${s.net}` : s.net}
                   </span>
                 </div>
