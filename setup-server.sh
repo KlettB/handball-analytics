@@ -26,7 +26,8 @@ echo "==> Creating .env file..."
 cat > .env << 'EOF'
 NODE_ENV=production
 PORT=3001
-TEAM_ID=handball4all.baden-wuerttemberg.1331231
+TEAM_ID=handball4all.baden-wuerttemberg.1331086
+TEAM_NAME=HTV Meißenheim
 SEASON_START=2025-07-01
 SEASON_END=2026-06-30
 EOF

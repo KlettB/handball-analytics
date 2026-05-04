@@ -1,7 +1,7 @@
 # Handball Analytics WebApp
 
 ## Was ist das?
-WebApp die Spielverlaufsdaten von handball.net per RSC-API abruft, in SQLite speichert und als interaktives Analytics-Dashboard visualisiert. Zielmannschaft: **TSV Wolfschlugen** (Männer-Oberliga BW).
+WebApp die Spielverlaufsdaten von handball.net per RSC-API abruft, in SQLite speichert und als interaktives Analytics-Dashboard visualisiert. Zielmannschaft: **HTV Meißenheim**.
 
 ## Tech-Stack
 - **Backend**: Node.js + Express (Port 3001)
@@ -22,8 +22,8 @@ WebApp die Spielverlaufsdaten von handball.net per RSC-API abruft, in SQLite spe
 
 ## Konfiguration (Environment)
 ```
-TEAM_ID=handball4all.baden-wuerttemberg.1331231
-TEAM_NAME=TSV Wolfschlugen
+TEAM_ID=handball4all.baden-wuerttemberg.1331086
+TEAM_NAME=HTV Meißenheim
 SEASON_START=2025-07-01
 SEASON_END=2026-06-30
 FETCH_LEAGUE_WIDE=false          # true → wöchentlicher Cron für Liga-weiten Fetch

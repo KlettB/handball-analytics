@@ -15,10 +15,10 @@ function parseTime(timeStr) {
 /**
  * Parse player name and number from event message.
  * Examples:
- *   "Tor durch Felix Mendler (21.) (TSV Wolfschlugen)"
- *   "7-Meter Tor durch Patrick Kohl (5.) (TSV Wolfschlugen)"
- *   "Jonas Jacobs (24.) (TSV Wolfschlugen) erhält eine 2-Minuten Strafe"
- *   "Jonas Jacobs (24.) (TSV Wolfschlugen) wurde verwarnt"
+ *   "Tor durch Felix Mendler (21.) (HTV Meißenheim)"
+ *   "7-Meter Tor durch Patrick Kohl (5.) (HTV Meißenheim)"
+ *   "Jonas Jacobs (24.) (HTV Meißenheim) erhält eine 2-Minuten Strafe"
+ *   "Jonas Jacobs (24.) (HTV Meißenheim) wurde verwarnt"
  */
 function parsePlayerFromMessage(message) {
   if (!message) return { playerName: null, playerNumber: null };
