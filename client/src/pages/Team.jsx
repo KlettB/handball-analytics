@@ -68,6 +68,35 @@ function FilterToggle({ options, value, onChange }) {
   );
 }
 
+function FilterChipGroup({ options, values, onChange }) {
+  const toggle = (v) => {
+    const next = new Set(values);
+    if (next.has(v)) next.delete(v);
+    else next.add(v);
+    onChange(next);
+  };
+  return (
+    <div className="flex gap-1.5 text-xs">
+      {options.map((o) => {
+        const active = values.has(o.value);
+        return (
+          <button
+            key={o.value}
+            onClick={() => toggle(o.value)}
+            className={`px-3 py-1.5 rounded-lg border transition-colors ${
+              active
+                ? 'bg-gray-200 dark:bg-gray-600 text-gray-900 dark:text-white border-gray-300 dark:border-gray-500'
+                : 'bg-white dark:bg-gray-800 text-gray-500 dark:text-gray-400 border-gray-100 dark:border-gray-700 hover:text-gray-900 dark:hover:text-white'
+            }`}
+          >
+            {o.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 function PowerplayCard({ label, data, color, bg, border }) {
   if (!data) return null;
   return (
@@ -117,7 +146,12 @@ export default function Team() {
   const [activeTab, setActiveTab] = useState('uebersicht');
   const [filterLocation, setFilterLocation] = useState('all');
   const [filterHalf, setFilterHalf] = useState('all');
+  const [filterOutcome, setFilterOutcome] = useState(() => new Set());
+  const [filterForm, setFilterForm] = useState('all');
   const [filterLoading, setFilterLoading] = useState(false);
+  const [phaseMatchCount, setPhaseMatchCount] = useState(null);
+  const [patterns, setPatterns] = useState(null);
+  const [patternsLoading, setPatternsLoading] = useState(false);
   const [trendLocation, setTrendLocation] = useState('all');
   const [trendHalf, setTrendHalf] = useState('all');
   const [trendLoading, setTrendLoading] = useState(false);
@@ -134,7 +168,8 @@ export default function Team() {
     ])
       .then(([m, p, pe, pp, cb, fd, gt]) => {
         setMatches(m);
-        setPhases(p);
+        setPhases(p.blocks || []);
+        setPhaseMatchCount(p.matchCount ?? null);
         setPhaseExtremes(pe);
         setPowerplay(pp);
         setComebacks(cb);
@@ -148,20 +183,43 @@ export default function Team() {
   useEffect(() => {
     if (activeTab !== 'phasen') return;
     setFilterLoading(true);
-    const params = new URLSearchParams({ location: filterLocation, half: filterHalf });
+    const params = new URLSearchParams({
+      location: filterLocation,
+      half: filterHalf,
+      formRange: filterForm,
+    });
+    if (filterOutcome.size > 0 && filterOutcome.size < 3) {
+      params.set('outcome', [...filterOutcome].join(','));
+    }
     Promise.all([
       fetch(`/api/stats/phases?${params}`).then((r) => r.json()),
       fetch(`/api/stats/phases/extremes?${params}`).then((r) => r.json()),
       fetch(`/api/stats/powerplay?${params}`).then((r) => r.json()),
     ])
       .then(([p, pe, pp]) => {
-        setPhases(p);
+        setPhases(p.blocks || []);
+        setPhaseMatchCount(p.matchCount ?? null);
         setPhaseExtremes(pe);
         setPowerplay(pp);
       })
       .catch(console.error)
       .finally(() => setFilterLoading(false));
-  }, [filterLocation, filterHalf, activeTab]);
+  }, [filterLocation, filterHalf, filterOutcome, filterForm, activeTab]);
+
+  useEffect(() => {
+    if (activeTab !== 'muster') return;
+    setPatternsLoading(true);
+    const params = new URLSearchParams({
+      location: filterLocation,
+      half: filterHalf,
+      formRange: filterForm,
+    });
+    fetch(`/api/stats/patterns?${params}`)
+      .then((r) => r.json())
+      .then(setPatterns)
+      .catch(console.error)
+      .finally(() => setPatternsLoading(false));
+  }, [filterLocation, filterHalf, filterForm, activeTab]);
 
   useEffect(() => {
     setTrendLoading(true);
@@ -222,6 +280,7 @@ export default function Team() {
         {[
           { id: 'uebersicht', label: 'Übersicht' },
           { id: 'phasen', label: 'Phasenanalyse' },
+          { id: 'muster', label: 'Muster' },
         ].map((tab) => (
           <button
             key={tab.id}
@@ -240,26 +299,54 @@ export default function Team() {
       {activeTab === 'phasen' && (
         <div className="space-y-6">
           {/* Filters */}
-          <div className="flex flex-wrap gap-3 items-center">
-            <FilterToggle
-              options={[
-                { value: 'all', label: 'Alle Spiele' },
-                { value: 'home', label: 'Heim' },
-                { value: 'away', label: 'Auswärts' },
-              ]}
-              value={filterLocation}
-              onChange={setFilterLocation}
-            />
-            <FilterToggle
-              options={[
-                { value: 'all', label: 'Beide HZ' },
-                { value: '1', label: '1. Halbzeit' },
-                { value: '2', label: '2. Halbzeit' },
-              ]}
-              value={filterHalf}
-              onChange={setFilterHalf}
-            />
-            {filterLoading && <span className="text-xs text-gray-500">Lädt...</span>}
+          <div className="space-y-2">
+            <div className="flex flex-wrap gap-3 items-center">
+              <FilterToggle
+                options={[
+                  { value: 'all', label: 'Alle Spiele' },
+                  { value: 'home', label: 'Heim' },
+                  { value: 'away', label: 'Auswärts' },
+                ]}
+                value={filterLocation}
+                onChange={setFilterLocation}
+              />
+              <FilterToggle
+                options={[
+                  { value: 'all', label: 'Beide HZ' },
+                  { value: '1', label: '1. Halbzeit' },
+                  { value: '2', label: '2. Halbzeit' },
+                ]}
+                value={filterHalf}
+                onChange={setFilterHalf}
+              />
+              <FilterToggle
+                options={[
+                  { value: 'all', label: 'Saison' },
+                  { value: '10', label: 'Letzte 10' },
+                  { value: '5', label: 'Letzte 5' },
+                  { value: '3', label: 'Letzte 3' },
+                ]}
+                value={filterForm}
+                onChange={setFilterForm}
+              />
+            </div>
+            <div className="flex flex-wrap gap-3 items-center">
+              <FilterChipGroup
+                options={[
+                  { value: 'win', label: 'Sieg' },
+                  { value: 'draw', label: 'Unent.' },
+                  { value: 'loss', label: 'Niederlage' },
+                ]}
+                values={filterOutcome}
+                onChange={setFilterOutcome}
+              />
+              {filterLoading && <span className="text-xs text-gray-500">Lädt...</span>}
+            </div>
+            {phaseMatchCount != null && (
+              <p className="text-xs text-gray-400 dark:text-gray-500">
+                Basis: {phaseMatchCount} {phaseMatchCount === 1 ? 'Spiel' : 'Spiele'}
+              </p>
+            )}
           </div>
 
           {/* Power / Death Phase */}
@@ -402,6 +489,212 @@ export default function Team() {
               })()}
             </div>
           )}
+        </div>
+      )}
+
+      {activeTab === 'muster' && (
+        <div className="space-y-6">
+          {/* Shared filters (no outcome — the tab itself compares outcomes) */}
+          <div className="flex flex-wrap gap-3 items-center">
+            <FilterToggle
+              options={[
+                { value: 'all', label: 'Alle Spiele' },
+                { value: 'home', label: 'Heim' },
+                { value: 'away', label: 'Auswärts' },
+              ]}
+              value={filterLocation}
+              onChange={setFilterLocation}
+            />
+            <FilterToggle
+              options={[
+                { value: 'all', label: 'Beide HZ' },
+                { value: '1', label: '1. Halbzeit' },
+                { value: '2', label: '2. Halbzeit' },
+              ]}
+              value={filterHalf}
+              onChange={setFilterHalf}
+            />
+            <FilterToggle
+              options={[
+                { value: 'all', label: 'Saison' },
+                { value: '10', label: 'Letzte 10' },
+                { value: '5', label: 'Letzte 5' },
+                { value: '3', label: 'Letzte 3' },
+              ]}
+              value={filterForm}
+              onChange={setFilterForm}
+            />
+            {patternsLoading && <span className="text-xs text-gray-500">Lädt...</span>}
+          </div>
+
+          {patterns && (() => {
+            const { matchCounts, phaseComparison, halftimeLead, endphase } = patterns;
+            const hasWins = matchCounts.wins > 0;
+            const hasLosses = matchCounts.losses > 0;
+
+            if (!hasWins && !hasLosses) {
+              return (
+                <div className="bg-white dark:bg-gray-800 rounded-lg p-5 text-center text-sm text-gray-500">
+                  Keine Spiele für die aktuellen Filter vorhanden.
+                </div>
+              );
+            }
+
+            const maxVal = Math.max(
+              ...phaseComparison.flatMap((p) => [
+                p.winAvgGoals, p.winAvgConceded, p.lossAvgGoals, p.lossAvgConceded,
+              ]),
+              0.1,
+            );
+
+            const fmt = (n) => (n == null ? '–' : n.toFixed(1));
+            const signed = (n) => (n > 0 ? `+${n.toFixed(1)}` : n.toFixed(1));
+
+            return (
+              <>
+                {/* Phase comparison */}
+                <div className="bg-white dark:bg-gray-800 rounded-lg p-5 shadow-sm dark:shadow-none">
+                  <h2 className="text-sm text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">Phasen-Vergleich</h2>
+                  <p className="text-xs text-gray-400 dark:text-gray-500 mb-4">
+                    Ø Tore / Gegentore pro Spiel, je 5-Minuten-Block
+                  </p>
+                  {hasWins || hasLosses ? (
+                    <div className="space-y-1.5">
+                      <div className="grid grid-cols-[3.5rem_1fr_1fr] gap-2 text-[10px] text-gray-400 uppercase tracking-wide">
+                        <div></div>
+                        <div className="text-center">Siege (Ø)</div>
+                        <div className="text-center">Niederlagen (Ø)</div>
+                      </div>
+                      {phaseComparison.map((p) => {
+                        const winG = Math.round((p.winAvgGoals / maxVal) * 100);
+                        const winC = Math.round((p.winAvgConceded / maxVal) * 100);
+                        const lossG = Math.round((p.lossAvgGoals / maxVal) * 100);
+                        const lossC = Math.round((p.lossAvgConceded / maxVal) * 100);
+                        return (
+                          <div key={p.block} className="grid grid-cols-[3.5rem_1fr_1fr] gap-2 text-xs items-center">
+                            <span className="text-right text-gray-400 dark:text-gray-500">{p.label}</span>
+                            <div className="flex flex-col gap-0.5">
+                              <div className="flex items-center gap-1">
+                                <div className="h-3 bg-green-600 rounded-sm" style={{ width: `${winG}%`, minWidth: winG > 0 ? 4 : 0 }} />
+                                <span className="text-gray-400 text-[10px]">{fmt(p.winAvgGoals)}</span>
+                              </div>
+                              <div className="flex items-center gap-1">
+                                <div className="h-3 bg-red-700 rounded-sm" style={{ width: `${winC}%`, minWidth: winC > 0 ? 4 : 0 }} />
+                                <span className="text-gray-500 text-[10px]">{fmt(p.winAvgConceded)}</span>
+                              </div>
+                            </div>
+                            <div className="flex flex-col gap-0.5">
+                              <div className="flex items-center gap-1">
+                                <div className="h-3 bg-green-600 rounded-sm" style={{ width: `${lossG}%`, minWidth: lossG > 0 ? 4 : 0 }} />
+                                <span className="text-gray-400 text-[10px]">{fmt(p.lossAvgGoals)}</span>
+                              </div>
+                              <div className="flex items-center gap-1">
+                                <div className="h-3 bg-red-700 rounded-sm" style={{ width: `${lossC}%`, minWidth: lossC > 0 ? 4 : 0 }} />
+                                <span className="text-gray-500 text-[10px]">{fmt(p.lossAvgConceded)}</span>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-gray-500">Zu wenig Daten für den Vergleich.</p>
+                  )}
+                  <div className="flex gap-4 mt-3 text-xs text-gray-400 dark:text-gray-500">
+                    <span className="flex items-center gap-1"><span className="w-3 h-2 bg-green-600 rounded-sm inline-block" /> Eigene Tore</span>
+                    <span className="flex items-center gap-1"><span className="w-3 h-2 bg-red-700 rounded-sm inline-block" /> Gegentore</span>
+                  </div>
+                </div>
+
+                {/* Halftime lead */}
+                <div className="bg-white dark:bg-gray-800 rounded-lg p-5 shadow-sm dark:shadow-none">
+                  <h2 className="text-sm text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">Ausgangslage zur Pause</h2>
+                  <p className="text-xs text-gray-400 dark:text-gray-500 mb-4">
+                    Ø Tordifferenz zur Halbzeit + Verteilung
+                  </p>
+                  <div className="grid grid-cols-2 gap-4">
+                    {[
+                      { key: 'wins', label: 'In Siegen', data: halftimeLead.wins, count: matchCounts.wins, bg: 'bg-green-50 dark:bg-green-900/20', border: 'border-green-200 dark:border-green-800/40', color: 'text-green-600 dark:text-green-400' },
+                      { key: 'losses', label: 'In Niederlagen', data: halftimeLead.losses, count: matchCounts.losses, bg: 'bg-red-50 dark:bg-red-900/20', border: 'border-red-200 dark:border-red-800/40', color: 'text-red-600 dark:text-red-400' },
+                    ].map((b) => (
+                      <div key={b.key} className={`rounded-lg p-4 border ${b.bg} ${b.border}`}>
+                        <div className={`text-xs font-semibold mb-2 ${b.color}`}>{b.label}</div>
+                        {b.count === 0 || b.data.avgLead == null ? (
+                          <div className="text-xs text-gray-500">Keine Daten</div>
+                        ) : (
+                          <>
+                            <div className="text-2xl font-bold mb-1" style={{ color: b.data.avgLead > 0 ? '#22c55e' : b.data.avgLead < 0 ? '#ef4444' : '#eab308' }}>
+                              {signed(b.data.avgLead)}
+                            </div>
+                            <div className="text-[10px] text-gray-500 mb-3">Ø Tordiff. zur Pause</div>
+                            <div className="space-y-1 text-xs">
+                              <div className="flex justify-between">
+                                <span className="text-gray-500">Führend</span>
+                                <span className="font-medium text-green-400">{b.data.matchesLeading}</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span className="text-gray-500">Ausgeglichen</span>
+                                <span className="font-medium text-gray-500">{b.data.matchesLevel}</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span className="text-gray-500">Hinten</span>
+                                <span className="font-medium text-red-400">{b.data.matchesTrailing}</span>
+                              </div>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Endphase */}
+                <div className="bg-white dark:bg-gray-800 rounded-lg p-5 shadow-sm dark:shadow-none">
+                  <h2 className="text-sm text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">Endphase (50.–60. Minute)</h2>
+                  <p className="text-xs text-gray-400 dark:text-gray-500 mb-4">
+                    Ø Tore/Gegentore pro Spiel in den letzten 10 Minuten
+                  </p>
+                  <div className="grid grid-cols-2 gap-4">
+                    {[
+                      { key: 'wins', label: 'In Siegen', data: endphase.wins, count: matchCounts.wins, bg: 'bg-green-50 dark:bg-green-900/20', border: 'border-green-200 dark:border-green-800/40', color: 'text-green-600 dark:text-green-400' },
+                      { key: 'losses', label: 'In Niederlagen', data: endphase.losses, count: matchCounts.losses, bg: 'bg-red-50 dark:bg-red-900/20', border: 'border-red-200 dark:border-red-800/40', color: 'text-red-600 dark:text-red-400' },
+                    ].map((b) => (
+                      <div key={b.key} className={`rounded-lg p-4 border ${b.bg} ${b.border}`}>
+                        <div className={`text-xs font-semibold mb-3 ${b.color}`}>{b.label}</div>
+                        {b.count === 0 ? (
+                          <div className="text-xs text-gray-500">Keine Daten</div>
+                        ) : (
+                          <div className="space-y-1.5 text-xs">
+                            <div className="flex justify-between">
+                              <span className="text-gray-500">Eigene Tore</span>
+                              <span className="font-medium text-green-400">{fmt(b.data.avgGoals)}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-gray-500">Gegentore</span>
+                              <span className="font-medium text-red-400">{fmt(b.data.avgConceded)}</span>
+                            </div>
+                            <div className="flex justify-between border-t border-gray-100 dark:border-gray-700 pt-1.5">
+                              <span className="text-gray-500">Netto</span>
+                              <span className="font-bold" style={{ color: b.data.netAvg > 0 ? '#22c55e' : b.data.netAvg < 0 ? '#ef4444' : '#eab308' }}>
+                                {signed(b.data.netAvg)}
+                              </span>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Match count footer */}
+                <p className="text-xs text-gray-400 dark:text-gray-500 text-center">
+                  Basis: {matchCounts.wins} {matchCounts.wins === 1 ? 'Sieg' : 'Siege'} ·{' '}
+                  {matchCounts.draws} {matchCounts.draws === 1 ? 'Unentschieden' : 'Unentschieden'} ·{' '}
+                  {matchCounts.losses} {matchCounts.losses === 1 ? 'Niederlage' : 'Niederlagen'}
+                </p>
+              </>
+            );
+          })()}
         </div>
       )}
 

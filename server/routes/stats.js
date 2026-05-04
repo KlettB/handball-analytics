@@ -19,6 +19,64 @@ function isHomeForTeam(match, teamId) {
   return match.home_team_id === teamId;
 }
 
+/**
+ * Build SQL fragment filtering matches by outcome for the configured team.
+ * @param {string|undefined} outcome - comma-separated list of "win", "draw", "loss"
+ * @param {string} alias - table alias for the matches table (e.g. 'm' or '')
+ */
+function buildOutcomeFilter(outcome, alias = 'm') {
+  if (!outcome) return '';
+  const selected = outcome.split(',').map((o) => o.trim()).filter((o) => ['win', 'draw', 'loss'].includes(o));
+  if (selected.length === 0 || selected.length === 3) return '';
+  const a = alias ? `${alias}.` : '';
+  const parts = [];
+  if (selected.includes('win')) {
+    parts.push(`((${a}home_team_id = @teamId AND ${a}home_goals > ${a}away_goals) OR (${a}away_team_id = @teamId AND ${a}away_goals > ${a}home_goals))`);
+  }
+  if (selected.includes('draw')) {
+    parts.push(`(${a}home_goals = ${a}away_goals)`);
+  }
+  if (selected.includes('loss')) {
+    parts.push(`((${a}home_team_id = @teamId AND ${a}home_goals < ${a}away_goals) OR (${a}away_team_id = @teamId AND ${a}away_goals < ${a}home_goals))`);
+  }
+  return `AND (${parts.join(' OR ')})`;
+}
+
+/**
+ * Build SQL fragment restricting matches to the team's last N finished games.
+ */
+function buildFormFilter(formRange, alias = 'm') {
+  const formN = Number(formRange);
+  if (![3, 5, 10].includes(formN)) return '';
+  const a = alias ? `${alias}.` : '';
+  return `AND ${a}id IN (
+    SELECT id FROM matches
+    WHERE state = 'Post' AND home_goals IS NOT NULL
+      AND (home_team_id = @teamId OR away_team_id = @teamId)
+    ORDER BY starts_at DESC LIMIT ${formN}
+  )`;
+}
+
+/**
+ * Count matches for the configured team under the given filters.
+ */
+function countMatches(db, teamId, { location, outcome, formRange }) {
+  let locationFilter = '';
+  if (location === 'home') locationFilter = 'AND m.home_team_id = @teamId';
+  else if (location === 'away') locationFilter = 'AND m.away_team_id = @teamId';
+  const outcomeFilter = buildOutcomeFilter(outcome, 'm');
+  const formFilter = buildFormFilter(formRange, 'm');
+  const row = db.prepare(`
+    SELECT COUNT(*) AS cnt FROM matches m
+    WHERE m.state = 'Post' AND m.home_goals IS NOT NULL
+      AND (m.home_team_id = @teamId OR m.away_team_id = @teamId)
+      ${locationFilter}
+      ${outcomeFilter}
+      ${formFilter}
+  `).get({ teamId });
+  return row?.cnt || 0;
+}
+
 // GET /api/stats/players - season stats for the configured team's players
 router.get('/players', (req, res) => {
   const db = getDb();
@@ -48,11 +106,11 @@ router.get('/players', (req, res) => {
 });
 
 // GET /api/stats/phases - goals per 5-minute block across the season
-// Query params: location=home|away|all, half=1|2|all
+// Query params: location=home|away|all, half=1|2|all, outcome=win,draw,loss, formRange=all|10|5|3
 router.get('/phases', (req, res) => {
   const db = getDb();
   const teamId = getTeamId(req);
-  const { location = 'all', half = 'all' } = req.query;
+  const { location = 'all', half = 'all', outcome, formRange = 'all' } = req.query;
 
   let locationFilter = '';
   if (location === 'home') locationFilter = 'AND m.home_team_id = @teamId';
@@ -61,6 +119,9 @@ router.get('/phases', (req, res) => {
   let halfFilter = '';
   if (half === '1') halfFilter = 'AND me.elapsed_seconds < 1800';
   else if (half === '2') halfFilter = 'AND me.elapsed_seconds >= 1800';
+
+  const outcomeFilter = buildOutcomeFilter(outcome, 'm');
+  const formFilter = buildFormFilter(formRange, 'm');
 
   const events = db.prepare(`
     SELECT me.team, me.elapsed_seconds, m.home_team_id
@@ -72,6 +133,8 @@ router.get('/phases', (req, res) => {
       AND (m.home_team_id = @teamId OR m.away_team_id = @teamId)
       ${locationFilter}
       ${halfFilter}
+      ${outcomeFilter}
+      ${formFilter}
   `).all({ teamId });
 
   const blocks = Array.from({ length: 12 }, (_, i) => ({
@@ -91,25 +154,35 @@ router.get('/phases', (req, res) => {
     }
   }
 
-  res.json(blocks.map((b) => ({ ...b, net: b.teamGoals - b.oppGoals })));
+  const matchCount = countMatches(db, teamId, { location, outcome, formRange });
+
+  res.json({
+    blocks: blocks.map((b) => ({ ...b, net: b.teamGoals - b.oppGoals })),
+    matchCount,
+  });
 });
 
 // GET /api/stats/powerplay - season powerplay/shorthanded/gleichzahl summary
-// Query params: location=home|away|all, half=1|2|all
+// Query params: location=home|away|all, half=1|2|all, outcome=win,draw,loss, formRange=all|10|5|3
 router.get('/powerplay', (req, res) => {
   const db = getDb();
   const teamId = getTeamId(req);
-  const { location = 'all', half = 'all' } = req.query;
+  const { location = 'all', half = 'all', outcome, formRange = 'all' } = req.query;
 
   let locationFilter = '';
-  if (location === 'home') locationFilter = 'AND home_team_id = @teamId';
-  else if (location === 'away') locationFilter = 'AND away_team_id = @teamId';
+  if (location === 'home') locationFilter = 'AND m.home_team_id = @teamId';
+  else if (location === 'away') locationFilter = 'AND m.away_team_id = @teamId';
+
+  const outcomeFilter = buildOutcomeFilter(outcome, 'm');
+  const formFilter = buildFormFilter(formRange, 'm');
 
   const matches = db.prepare(`
-    SELECT id, home_team_id FROM matches
-    WHERE state = 'Post'
-      AND (home_team_id = @teamId OR away_team_id = @teamId)
+    SELECT m.id, m.home_team_id FROM matches m
+    WHERE m.state = 'Post' AND m.home_goals IS NOT NULL
+      AND (m.home_team_id = @teamId OR m.away_team_id = @teamId)
       ${locationFilter}
+      ${outcomeFilter}
+      ${formFilter}
   `).all({ teamId });
 
   const emptyBucket = () => ({ total: 0, goals: 0, conceded: 0, won: 0, neutral: 0, lost: 0 });
@@ -170,6 +243,7 @@ router.get('/powerplay', (req, res) => {
     summary.gleichzahl.conceded += gleichzahlGoals.filter((g) => g.team === opp).length;
   }
 
+  summary.matchCount = matches.length;
   res.json(summary);
 });
 
@@ -226,11 +300,11 @@ router.get('/comebacks', (req, res) => {
 });
 
 // GET /api/stats/phases/extremes - rolling 5-min window power/death phase
-// Query params: location=home|away|all, half=1|2|all
+// Query params: location=home|away|all, half=1|2|all, outcome=win,draw,loss, formRange=all|10|5|3
 router.get('/phases/extremes', (req, res) => {
   const db = getDb();
   const teamId = getTeamId(req);
-  const { location = 'all', half = 'all' } = req.query;
+  const { location = 'all', half = 'all', outcome, formRange = 'all' } = req.query;
 
   let locationFilter = '';
   if (location === 'home') locationFilter = 'AND m.home_team_id = @teamId';
@@ -239,6 +313,9 @@ router.get('/phases/extremes', (req, res) => {
   let halfFilter = '';
   if (half === '1') halfFilter = 'AND me.elapsed_seconds < 1800';
   else if (half === '2') halfFilter = 'AND me.elapsed_seconds >= 1800';
+
+  const outcomeFilter = buildOutcomeFilter(outcome, 'm');
+  const formFilter = buildFormFilter(formRange, 'm');
 
   const events = db.prepare(`
     SELECT me.team, me.elapsed_seconds, m.home_team_id
@@ -250,10 +327,14 @@ router.get('/phases/extremes', (req, res) => {
       AND (m.home_team_id = @teamId OR m.away_team_id = @teamId)
       ${locationFilter}
       ${halfFilter}
+      ${outcomeFilter}
+      ${formFilter}
   `).all({ teamId });
 
+  const matchCount = countMatches(db, teamId, { location, outcome, formRange });
+
   if (events.length === 0) {
-    return res.json({ powerPhase: null, deathPhase: null });
+    return res.json({ powerPhase: null, deathPhase: null, matchCount });
   }
 
   const maxStart = 55;
@@ -278,7 +359,7 @@ router.get('/phases/extremes', (req, res) => {
     if (!worst || net < worst.net || (net === worst.net && oGoals > worst.oppGoals)) worst = entry;
   }
 
-  res.json({ powerPhase: best, deathPhase: worst });
+  res.json({ powerPhase: best, deathPhase: worst, matchCount });
 });
 
 // GET /api/stats/form - per-game data for form curve (chronological)
@@ -372,6 +453,151 @@ router.get('/goals-trend', (req, res) => {
   });
 
   res.json(result);
+});
+
+// GET /api/stats/patterns - side-by-side comparison of wins, draws and losses
+// Query params: location=home|away|all, half=1|2|all, formRange=all|10|5|3
+router.get('/patterns', (req, res) => {
+  const db = getDb();
+  const teamId = getTeamId(req);
+  const { location = 'all', half = 'all', formRange = 'all' } = req.query;
+
+  let locationFilter = '';
+  if (location === 'home') locationFilter = 'AND m.home_team_id = @teamId';
+  else if (location === 'away') locationFilter = 'AND m.away_team_id = @teamId';
+  const formFilter = buildFormFilter(formRange, 'm');
+
+  const matches = db.prepare(`
+    SELECT m.id, m.home_team_id, m.home_goals, m.away_goals,
+           m.home_goals_half, m.away_goals_half
+    FROM matches m
+    WHERE m.state = 'Post' AND m.home_goals IS NOT NULL
+      AND (m.home_team_id = @teamId OR m.away_team_id = @teamId)
+      ${locationFilter}
+      ${formFilter}
+  `).all({ teamId });
+
+  const halfConstraint =
+    half === '1' ? 'AND elapsed_seconds < 1800' :
+    half === '2' ? 'AND elapsed_seconds >= 1800' : '';
+
+  const eventsStmt = db.prepare(`
+    SELECT team, elapsed_seconds
+    FROM match_events
+    WHERE match_id = ? AND type IN ('Goal', 'SevenMeterGoal')
+      AND elapsed_seconds IS NOT NULL
+      ${halfConstraint}
+  `);
+
+  // Fallback for halftime score when matches.home_goals_half is NULL:
+  // use the last goal event before second 1800.
+  const halftimeScoreStmt = db.prepare(`
+    SELECT score_home, score_away
+    FROM match_events
+    WHERE match_id = ? AND type IN ('Goal', 'SevenMeterGoal')
+      AND elapsed_seconds IS NOT NULL AND elapsed_seconds < 1800
+      AND score_home IS NOT NULL AND score_away IS NOT NULL
+    ORDER BY elapsed_seconds DESC, id DESC
+    LIMIT 1
+  `);
+
+  const bucket = () => ({
+    count: 0,
+    blocks: Array.from({ length: 12 }, () => ({ goals: 0, conceded: 0 })),
+    endGoals: 0,
+    endConceded: 0,
+    leadAtHalfSum: 0,
+    leadAtHalfHas: 0,
+    matchesLeading: 0,
+    matchesLevel: 0,
+    matchesTrailing: 0,
+  });
+  const buckets = { wins: bucket(), draws: bucket(), losses: bucket() };
+
+  for (const m of matches) {
+    const isHome = isHomeForTeam(m, teamId);
+    const own = isHome ? m.home_goals : m.away_goals;
+    const opp = isHome ? m.away_goals : m.home_goals;
+    const key = own > opp ? 'wins' : own === opp ? 'draws' : 'losses';
+    const b = buckets[key];
+    b.count++;
+
+    // Halftime lead — use DB field if present, else fall back to last goal before 30:00
+    let ownHalf = isHome ? m.home_goals_half : m.away_goals_half;
+    let oppHalf = isHome ? m.away_goals_half : m.home_goals_half;
+    if (ownHalf == null || oppHalf == null) {
+      const row = halftimeScoreStmt.get(m.id);
+      if (row) {
+        ownHalf = isHome ? row.score_home : row.score_away;
+        oppHalf = isHome ? row.score_away : row.score_home;
+      } else {
+        ownHalf = 0;
+        oppHalf = 0;
+      }
+    }
+    const diff = ownHalf - oppHalf;
+    b.leadAtHalfSum += diff;
+    b.leadAtHalfHas++;
+    if (diff > 0) b.matchesLeading++;
+    else if (diff === 0) b.matchesLevel++;
+    else b.matchesTrailing++;
+
+    // Event-based per-match aggregation (respects half filter)
+    const events = eventsStmt.all(m.id);
+    const myTeamSide = isHome ? 'Home' : 'Away';
+    for (const e of events) {
+      const block = Math.min(Math.floor(e.elapsed_seconds / 300), 11);
+      const isOwn = e.team === myTeamSide;
+      if (isOwn) b.blocks[block].goals++;
+      else b.blocks[block].conceded++;
+      if (e.elapsed_seconds >= 3000) {
+        if (isOwn) b.endGoals++;
+        else b.endConceded++;
+      }
+    }
+  }
+
+  const avg = (sum, count) => (count > 0 ? sum / count : 0);
+
+  const phaseComparison = Array.from({ length: 12 }, (_, i) => ({
+    block: i,
+    label: `${i * 5}–${(i + 1) * 5}'`,
+    winAvgGoals: +avg(buckets.wins.blocks[i].goals, buckets.wins.count).toFixed(2),
+    winAvgConceded: +avg(buckets.wins.blocks[i].conceded, buckets.wins.count).toFixed(2),
+    lossAvgGoals: +avg(buckets.losses.blocks[i].goals, buckets.losses.count).toFixed(2),
+    lossAvgConceded: +avg(buckets.losses.blocks[i].conceded, buckets.losses.count).toFixed(2),
+  }));
+
+  const halftimeLeadFor = (b) => ({
+    avgLead: b.leadAtHalfHas > 0 ? +avg(b.leadAtHalfSum, b.leadAtHalfHas).toFixed(2) : null,
+    matchesLeading: b.matchesLeading,
+    matchesLevel: b.matchesLevel,
+    matchesTrailing: b.matchesTrailing,
+  });
+
+  const endphaseFor = (b) => ({
+    avgGoals: +avg(b.endGoals, b.count).toFixed(2),
+    avgConceded: +avg(b.endConceded, b.count).toFixed(2),
+    netAvg: +avg(b.endGoals - b.endConceded, b.count).toFixed(2),
+  });
+
+  res.json({
+    matchCounts: {
+      wins: buckets.wins.count,
+      draws: buckets.draws.count,
+      losses: buckets.losses.count,
+    },
+    phaseComparison,
+    halftimeLead: {
+      wins: halftimeLeadFor(buckets.wins),
+      draws: halftimeLeadFor(buckets.draws),
+      losses: halftimeLeadFor(buckets.losses),
+    },
+    endphase: {
+      wins: endphaseFor(buckets.wins),
+      losses: endphaseFor(buckets.losses),
+    },
+  });
 });
 
 module.exports = router;
